@@ -18,6 +18,7 @@ import RuleDetailScreen from "./screens/RuleDetailScreen";
 import SignalFeedScreen from "./screens/SignalFeedScreen";
 import AnalyticsScreen from "./screens/AnalyticsScreen";
 import HelpScreen from "./screens/HelpScreen";
+import ManualWatchlistScreen from "./screens/ManualWatchlistScreen";
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -54,6 +55,7 @@ function WatchlistsStack() {
       <Stack.Screen name="RuleBuilder" component={RuleBuilderScreen} options={{ title: "New Rule" }} />
       <Stack.Screen name="RuleDetail" component={RuleDetailScreen} options={{ title: "Rule" }} />
       <Stack.Screen name="AlertChannels" component={AlertChannelsScreen} options={{ title: "Alert Channels" }} />
+      <Stack.Screen name="ManualWatchlist" component={ManualWatchlistScreen} options={{ title: "Enter Symbols" }} />
     </Stack.Navigator>
   );
 }

@@ -80,9 +80,22 @@ export default function WatchlistsScreen({ navigation }) {
           </View>
         }
       />
-      <TouchableOpacity style={styles.newButton} onPress={() => navigation.navigate("CriteriaBuilder")}>
-        <Text style={styles.newButtonText}>+ New Watchlist</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={[styles.newButton, styles.newButtonHalf]}
+          onPress={() => Alert.alert(
+            "Create Watchlist",
+            "How do you want to add symbols?",
+            [
+              { text: "Use Screener", onPress: () => navigation.navigate("CriteriaBuilder") },
+              { text: "Enter Symbols", onPress: () => navigation.navigate("ManualWatchlist") },
+              { text: "Cancel", style: "cancel" },
+            ]
+          )}
+        >
+          <Text style={styles.newButtonText}>+ New Watchlist</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -110,12 +123,14 @@ const styles = StyleSheet.create({
   emptyTitle: { ...typography.heading3, marginBottom: 8 },
   emptySub: { ...typography.bodySmall, textAlign: "center", lineHeight: 20 },
 
+  buttonRow: { flexDirection: "row", margin: 16, gap: 10 },
   newButton: {
-    margin: 16,
     backgroundColor: colors.accent,
     padding: 16,
     alignItems: "center",
     borderRadius: layout.buttonRadius,
+    flex: 1,
   },
+  newButtonHalf: { flex: 1 },
   newButtonText: { color: "#000", fontWeight: "800", fontSize: 16 },
 });

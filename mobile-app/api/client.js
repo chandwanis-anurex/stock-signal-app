@@ -39,6 +39,12 @@ export const api = {
       body: JSON.stringify({ name, criteria, refresh_interval_seconds: refreshIntervalSeconds }),
     }),
 
+  createWatchlistManual: (name, symbols) =>
+    request("/screener/watchlists/manual", {
+      method: "POST",
+      body: JSON.stringify({ name, symbols }),
+    }),
+
   listWatchlists: () => request("/screener/watchlists"),
 
   deleteWatchlist: (watchlistId) =>

@@ -48,6 +48,23 @@ def create_watchlist(payload: WatchlistCreate, db: Session = Depends(get_db), cu
     return {"id": wl.id, "name": wl.name}
 
 
+@router.post("/watchlists/manual")
+def create_watchlist_manual(payload: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    name = payload.get("name", "").strip()
+    symbols = [s.strip().upper() for s in payload.get("symbols", []) if s.strip()]
+    if not name or not symbols:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="name and symbols are required")
+    wl = Watchlist(user_id=current_user.id, name=name, screener_criteria=None, refresh_interval_seconds=0)
+    db.add(wl)
+    db.commit()
+    db.refresh(wl)
+    for sym in symbols:
+        db.add(WatchlistSymbol(watchlist_id=wl.id, symbol=sym, exchange=""))
+    db.commit()
+    return {"id": wl.id, "name": wl.name}
+
+
 @router.get("/watchlists")
 def list_watchlists(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     watchlists = db.query(Watchlist).filter(Watchlist.user_id == current_user.id).all()
