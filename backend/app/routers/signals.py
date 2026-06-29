@@ -27,6 +27,8 @@ def list_signals(
         q = q.filter(Signal.symbol == symbol)
 
     signals = q.order_by(Signal.fired_at.desc()).limit(200).all()
+    rule_ids = {s.rule_id for s in signals if s.rule_id}
+    rules = {r.id: r.name for r in db.query(Rule).filter(Rule.id.in_(rule_ids)).all()}
     return [
         {
             "id": s.id,
@@ -34,6 +36,7 @@ def list_signals(
             "side": s.side,
             "price_at_signal": s.price_at_signal,
             "fired_at": s.fired_at,
+            "rule_name": rules.get(s.rule_id, ""),
         }
         for s in signals
     ]

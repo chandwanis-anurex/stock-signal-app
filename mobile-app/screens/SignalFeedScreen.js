@@ -3,6 +3,7 @@ import { View, Text, FlatList, StyleSheet, RefreshControl } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../api/client";
 import { colors, typography, layout } from "../theme";
+import { getCompanyName } from "../data/companyNames";
 
 export default function SignalFeedScreen() {
   const [signals, setSignals] = useState([]);
@@ -34,18 +35,20 @@ export default function SignalFeedScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         renderItem={({ item }) => {
           const isBuy = item.side === "buy";
+          const companyName = getCompanyName(item.symbol);
           return (
             <View style={styles.card}>
-              <View style={styles.cardLeft}>
-                <View style={[styles.badge, isBuy ? styles.buyBadge : styles.sellBadge]}>
-                  <Text style={[styles.badgeText, { color: isBuy ? colors.buy : colors.sell }]}>
-                    {item.side.toUpperCase()}
-                  </Text>
-                </View>
+              <View style={[styles.badge, isBuy ? styles.buyBadge : styles.sellBadge]}>
+                <Text style={styles.badgeText}>{isBuy ? "BUY" : "SELL"}</Text>
               </View>
               <View style={styles.cardBody}>
                 <Text style={styles.symbol}>{item.symbol}</Text>
-                <Text style={styles.ruleName}>{item.rule_name || "—"}</Text>
+                {companyName ? (
+                  <Text style={styles.companyName}>{companyName}</Text>
+                ) : null}
+                {item.rule_name ? (
+                  <Text style={styles.ruleName}>{item.rule_name}</Text>
+                ) : null}
               </View>
               <View style={styles.cardRight}>
                 <Text style={styles.price}>${item.price_at_signal?.toFixed(2) ?? "—"}</Text>
@@ -78,18 +81,22 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
   },
-  cardLeft: { marginRight: 12 },
   badge: {
-    paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 6, borderWidth: 1,
+    width: 64,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  buyBadge: { backgroundColor: colors.buy + "18", borderColor: colors.buy },
-  sellBadge: { backgroundColor: colors.sell + "18", borderColor: colors.sell },
-  badgeText: { fontSize: 11, fontWeight: "800" },
+  buyBadge: { backgroundColor: colors.buy },
+  sellBadge: { backgroundColor: colors.sell },
+  badgeText: { color: "#ffffff", fontSize: 14, fontWeight: "800", letterSpacing: 0.5 },
   cardBody: { flex: 1 },
-  symbol: { fontSize: 16, fontWeight: "800", color: colors.textPrimary },
-  ruleName: { ...typography.bodySmall, marginTop: 2 },
+  symbol: { fontSize: 17, fontWeight: "800", color: colors.textPrimary },
+  companyName: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
+  ruleName: { fontSize: 11, color: colors.textMuted, marginTop: 3 },
   cardRight: { alignItems: "flex-end" },
   price: { fontSize: 15, fontWeight: "700", color: colors.textPrimary },
   time: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
