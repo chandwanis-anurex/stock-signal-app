@@ -3,6 +3,7 @@ import { View, Text, FlatList, StyleSheet, RefreshControl } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../api/client";
 import { colors, typography, layout } from "../theme";
+import { getCompanyName } from "../data/companyNames";
 
 export default function SignalFeedScreen() {
   const [signals, setSignals] = useState([]);
@@ -34,7 +35,10 @@ export default function SignalFeedScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         renderItem={({ item }) => {
           const isBuy = item.side === "buy";
-          const companyName = item.company_name || "";
+          const companyName = item.company_name || getCompanyName(item.symbol);
+          const firedAt = new Date(item.fired_at);
+          const dateStr = firedAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+          const timeStr = firedAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
           return (
             <View style={styles.card}>
               <View style={[styles.badge, isBuy ? styles.buyBadge : styles.sellBadge]}>
@@ -42,16 +46,13 @@ export default function SignalFeedScreen() {
               </View>
               <View style={styles.cardBody}>
                 <Text style={styles.symbol}>{item.symbol}</Text>
-                {companyName ? (
-                  <Text style={styles.companyName}>{companyName}</Text>
-                ) : null}
-                {item.rule_name ? (
-                  <Text style={styles.ruleName}>{item.rule_name}</Text>
-                ) : null}
+                {companyName ? <Text style={styles.companyName}>{companyName}</Text> : null}
+                {item.rule_name ? <Text style={styles.ruleName}>{item.rule_name}</Text> : null}
               </View>
               <View style={styles.cardRight}>
                 <Text style={styles.price}>${item.price_at_signal?.toFixed(2) ?? "—"}</Text>
-                <Text style={styles.time}>{new Date(item.fired_at).toLocaleDateString()}</Text>
+                <Text style={styles.time}>{dateStr}</Text>
+                <Text style={styles.time}>{timeStr}</Text>
               </View>
             </View>
           );
