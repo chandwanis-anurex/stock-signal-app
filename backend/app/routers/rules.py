@@ -49,6 +49,30 @@ def list_alert_channels(watchlist_id: int, rule_id: int, db: Session = Depends(g
     return [{"id": c.id, "channel_type": c.channel_type, "destination": c.destination, "active": c.active} for c in channels]
 
 
+@router.post("/{rule_id}/alert-channels/{channel_id}/test")
+def test_alert_channel(watchlist_id: int, rule_id: int, channel_id: int, db: Session = Depends(get_db)):
+    from fastapi import HTTPException
+    from datetime import datetime
+    from app.services.alert_dispatcher import dispatch
+
+    channel = db.query(AlertChannel).filter(AlertChannel.id == channel_id).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    class MockSignal:
+        symbol = "AAPL"
+        side = "buy"
+        price_at_signal = 195.42
+        fired_at = datetime.utcnow()
+        indicator_snapshot = {"rsi": 28.5, "close": 195.42}
+
+    try:
+        dispatch(channel, MockSignal())
+        return {"message": "Test alert sent"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/{rule_id}/alert-channels")
 def add_alert_channel(watchlist_id: int, rule_id: int, payload: AlertChannelCreate, db: Session = Depends(get_db)):
     channel = AlertChannel(

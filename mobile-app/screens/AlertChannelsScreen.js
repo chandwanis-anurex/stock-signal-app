@@ -46,9 +46,25 @@ export default function AlertChannelsScreen({ route, navigation }) {
     }
   };
 
+  const [testing, setTesting] = useState({});
+
   const toggle = (type) => {
     if (type === "push" && !destinations.push) { registerForPush(); return; }
     setEnabled((e) => ({ ...e, [type]: !e[type] }));
+  };
+
+  const testChannel = async (type) => {
+    const channelId = existingIds[type];
+    if (!channelId) return;
+    setTesting((t) => ({ ...t, [type]: true }));
+    try {
+      await api.testAlertChannel(watchlistId, ruleId, channelId);
+      Alert.alert("Test sent", `A test ${type} alert was sent successfully.`);
+    } catch (e) {
+      Alert.alert("Test failed", e.message);
+    } finally {
+      setTesting((t) => ({ ...t, [type]: false }));
+    }
   };
 
   const save = async () => {
@@ -98,6 +114,17 @@ export default function AlertChannelsScreen({ route, navigation }) {
           {c.type === "push" && enabled.push && (
             <Text style={styles.pushHint}>Device registered for push alerts.</Text>
           )}
+          {enabled[c.type] && existingIds[c.type] && (
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={() => testChannel(c.type)}
+              disabled={testing[c.type]}
+            >
+              <Text style={styles.testButtonText}>
+                {testing[c.type] ? "Sending..." : "Send Test"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       ))}
 
@@ -132,6 +159,11 @@ const styles = StyleSheet.create({
     fontSize: 14, marginTop: 12,
   },
   pushHint: { ...typography.bodySmall, marginTop: 10 },
+  testButton: {
+    marginTop: 10, borderWidth: 1, borderColor: colors.accent,
+    borderRadius: layout.buttonRadius, padding: 10, alignItems: "center",
+  },
+  testButtonText: { color: colors.accent, fontWeight: "700", fontSize: 13 },
   saveButton: {
     backgroundColor: colors.accent, padding: 16, alignItems: "center",
     borderRadius: layout.buttonRadius, marginVertical: 24,

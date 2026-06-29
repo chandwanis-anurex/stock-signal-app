@@ -60,6 +60,9 @@ export const api = {
   listAlertChannels: (watchlistId, ruleId) =>
     request(`/watchlists/${watchlistId}/rules/${ruleId}/alert-channels`),
 
+  testAlertChannel: (watchlistId, ruleId, channelId) =>
+    request(`/watchlists/${watchlistId}/rules/${ruleId}/alert-channels/${channelId}/test`, { method: "POST" }),
+
   addAlertChannel: (watchlistId, ruleId, channelType, destination) =>
     request(`/watchlists/${watchlistId}/rules/${ruleId}/alert-channels`, {
       method: "POST",
