@@ -14,15 +14,24 @@ export const colors = {
   danger: "#ff3b30",
 };
 
-export const typography = {
-  heading1: { fontSize: 28, fontWeight: "800", color: colors.textPrimary, letterSpacing: -0.5 },
-  heading2: { fontSize: 20, fontWeight: "700", color: colors.textPrimary },
-  heading3: { fontSize: 16, fontWeight: "700", color: colors.textPrimary },
-  body: { fontSize: 15, fontWeight: "400", color: colors.textPrimary },
-  bodySmall: { fontSize: 13, fontWeight: "400", color: colors.textSecondary },
-  label: { fontSize: 12, fontWeight: "600", color: colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.8 },
-  mono: { fontSize: 13, fontFamily: "Courier", color: colors.textPrimary },
+export const fonts = {
+  regular:   "Inter_400Regular",
+  semiBold:  "Inter_600SemiBold",
+  bold:      "Inter_700Bold",
+  extraBold: "Inter_800ExtraBold",
 };
+
+const base = {
+  heading1: { fontFamily: "Inter_800ExtraBold", fontSize: 30, color: colors.textPrimary, letterSpacing: -0.5 },
+  heading2: { fontFamily: "Inter_700Bold", fontSize: 22, color: colors.textPrimary },
+  heading3: { fontFamily: "Inter_700Bold", fontSize: 17, color: colors.textPrimary },
+  body:      { fontFamily: "Inter_400Regular", fontSize: 16, color: colors.textPrimary },
+  bodySmall: { fontFamily: "Inter_400Regular", fontSize: 14, color: colors.textSecondary },
+  label:     { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.8 },
+  mono:      { fontFamily: "Inter_600SemiBold", fontSize: 15, color: colors.textPrimary },
+};
+
+export const typography = base;
 
 export const layout = {
   screenPadding: 16,

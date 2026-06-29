@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from "@expo-google-fonts/inter";
 import { NavigationContainer, DarkTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -40,7 +41,7 @@ const headerLogo = () => <Logo size={36} style={{ marginRight: 12 }} />;
 const stackScreenOptions = {
   headerStyle: { backgroundColor: colors.card },
   headerTintColor: colors.textPrimary,
-  headerTitleStyle: { fontWeight: "700" },
+  headerTitleStyle: { fontFamily: "Inter_700Bold" },
   headerBackTitle: "",
   headerBackTitleVisible: false,
   headerRight: headerLogo,
@@ -104,7 +105,7 @@ function MainApp({ onLogout }) {
         tabBarInactiveTintColor: colors.textSecondary,
         headerStyle: { backgroundColor: colors.card },
         headerTintColor: colors.textPrimary,
-        headerTitleStyle: { fontWeight: "700" },
+        headerTitleStyle: { fontFamily: "Inter_700Bold" },
         headerRight: headerLogo,
       }}
     >
@@ -137,6 +138,7 @@ function MainApp({ onLogout }) {
 export default function App() {
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold });
 
   useEffect(() => {
     auth.getToken().then((token) => {
@@ -145,7 +147,7 @@ export default function App() {
     });
   }, []);
 
-  if (!ready) {
+  if (!ready || !fontsLoaded) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={colors.accent} />
@@ -171,16 +173,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card, borderRadius: 12, borderWidth: 1,
     borderColor: colors.border, padding: 24, marginBottom: 24, alignItems: "center", gap: 12,
   },
-  accountTitle: { fontSize: 22, fontWeight: "800", color: colors.textPrimary },
+  accountTitle: { fontSize: 22, fontFamily: "Inter_800ExtraBold", color: colors.textPrimary },
   accountSubtitle: { fontSize: 14, color: colors.textSecondary },
   helpButton: {
     borderWidth: 1, borderColor: colors.border,
     padding: 16, borderRadius: 10, alignItems: "center", marginBottom: 12,
   },
-  helpButtonText: { color: colors.textPrimary, fontWeight: "700", fontSize: 16 },
+  helpButtonText: { color: colors.textPrimary, fontFamily: "Inter_700Bold", fontSize: 16 },
   signOutButton: {
     backgroundColor: colors.danger + "22", borderWidth: 1, borderColor: colors.danger,
     padding: 16, borderRadius: 10, alignItems: "center",
   },
-  signOutText: { color: colors.danger, fontWeight: "700", fontSize: 16 },
+  signOutText: { color: colors.danger, fontFamily: "Inter_700Bold", fontSize: 16 },
 });

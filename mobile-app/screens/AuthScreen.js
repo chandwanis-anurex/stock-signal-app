@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   logoIcon: { fontSize: 28, color: "#000", fontWeight: "900" },
-  appName: { fontSize: 32, fontWeight: "800", color: colors.textPrimary, letterSpacing: -1 },
+  appName: { fontSize: 32, fontFamily: "Inter_800ExtraBold", color: colors.textPrimary, letterSpacing: -1 },
   tagline: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
 
   card: {
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   },
   modeTab: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 6 },
   modeTabActive: { backgroundColor: colors.accent },
-  modeTabText: { fontSize: 14, fontWeight: "600", color: colors.textSecondary },
+  modeTabText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.textSecondary },
   modeTabTextActive: { color: "#000" },
 
   inputLabel: { ...typography.label, marginBottom: 6 },
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: "#000", fontWeight: "800", fontSize: 16 },
+  buttonText: { color: "#000", fontFamily: "Inter_800ExtraBold", fontSize: 16 },
 
   footer: { textAlign: "center", color: colors.textMuted, fontSize: 12 },
 });

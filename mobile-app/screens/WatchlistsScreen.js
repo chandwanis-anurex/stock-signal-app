@@ -132,5 +132,5 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   newButtonHalf: { flex: 1 },
-  newButtonText: { color: "#000", fontWeight: "800", fontSize: 16 },
+  newButtonText: { color: "#000", fontFamily: "Inter_800ExtraBold", fontSize: 16 },
 });

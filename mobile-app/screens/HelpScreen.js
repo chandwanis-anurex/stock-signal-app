@@ -131,14 +131,14 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
     padding: 24, alignItems: "center", marginBottom: 24, gap: 8,
   },
-  appName: { fontSize: 24, fontWeight: "800", color: colors.textPrimary, marginTop: 4 },
+  appName: { fontSize: 24, fontFamily: "Inter_800ExtraBold", color: colors.textPrimary, marginTop: 4 },
   tagline: { ...typography.bodySmall, textAlign: "center" },
   versionRow: { flexDirection: "row", gap: 8, marginTop: 8 },
   versionBadge: {
     backgroundColor: colors.accentDim, borderWidth: 1, borderColor: colors.accent,
     borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4,
   },
-  versionText: { color: colors.accent, fontSize: 12, fontWeight: "700" },
+  versionText: { color: colors.accent, fontSize: 12, fontFamily: "Inter_700Bold" },
 
   sectionHeader: { ...typography.label, marginBottom: 12 },
 
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
   stepNum: {
     width: 22, height: 22, borderRadius: 11, backgroundColor: colors.accentDim,
     borderWidth: 1, borderColor: colors.accent,
-    textAlign: "center", lineHeight: 22, fontSize: 11, fontWeight: "700", color: colors.accent,
+    textAlign: "center", lineHeight: 22, fontSize: 11, fontFamily: "Inter_700Bold", color: colors.accent,
   },
   stepText: { ...typography.bodySmall, flex: 1, lineHeight: 20 },
 
@@ -163,5 +163,5 @@ const styles = StyleSheet.create({
     paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   infoLabel: { ...typography.bodySmall },
-  infoValue: { ...typography.body, fontWeight: "600", fontSize: 13 },
+  infoValue: { ...typography.body, fontFamily: "Inter_600SemiBold", fontSize: 13 },
 });

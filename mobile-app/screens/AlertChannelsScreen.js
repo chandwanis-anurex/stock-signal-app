@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   toggle: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
   toggleOn: { backgroundColor: colors.accentDim, borderColor: colors.accent },
   toggleOff: { backgroundColor: colors.border, borderColor: colors.border },
-  toggleText: { fontSize: 12, fontWeight: "700" },
+  toggleText: { fontSize: 12, fontFamily: "Inter_700Bold" },
   toggleTextOn: { color: colors.accent },
   toggleTextOff: { color: colors.textSecondary },
   input: {
@@ -197,12 +197,12 @@ const styles = StyleSheet.create({
     borderRadius: layout.buttonRadius, padding: 10, alignItems: "center",
   },
   testButtonDisabled: { borderColor: colors.textMuted },
-  testButtonText: { color: colors.accent, fontWeight: "700", fontSize: 13 },
+  testButtonText: { color: colors.accent, fontFamily: "Inter_700Bold", fontSize: 13 },
   testButtonTextDisabled: { color: colors.textMuted },
   saveButton: {
     backgroundColor: colors.accent, padding: 16, alignItems: "center",
     borderRadius: layout.buttonRadius, marginVertical: 24,
   },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { color: "#000", fontWeight: "800", fontSize: 16 },
+  saveButtonText: { color: "#000", fontFamily: "Inter_800ExtraBold", fontSize: 16 },
 });

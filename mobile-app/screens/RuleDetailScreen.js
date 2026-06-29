@@ -116,16 +116,16 @@ const styles = StyleSheet.create({
     marginBottom: 16, overflow: "hidden",
   },
   conditionHeader: { paddingHorizontal: 14, paddingVertical: 10 },
-  conditionTitle: { fontSize: 12, fontWeight: "800", letterSpacing: 0.8 },
+  conditionTitle: { fontSize: 12, fontFamily: "Inter_800ExtraBold", letterSpacing: 0.8 },
   termRow: {
     flexDirection: "row", alignItems: "center",
     paddingHorizontal: 14, paddingVertical: 12,
     borderTopWidth: 1, borderTopColor: colors.border,
     gap: 8,
   },
-  termIndicator: { ...typography.body, fontWeight: "700", flex: 2 },
+  termIndicator: { ...typography.body, fontFamily: "Inter_700Bold", flex: 2 },
   termOperator: { ...typography.bodySmall, flex: 1, textAlign: "center" },
-  termValue: { ...typography.body, color: colors.accent, fontWeight: "700", flex: 1, textAlign: "right" },
+  termValue: { ...typography.body, color: colors.accent, fontFamily: "Inter_700Bold", flex: 1, textAlign: "right" },
 
   exitTargetsRow: {
     flexDirection: "row", gap: 10, padding: 12,
@@ -135,17 +135,17 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: colors.cardAlt, borderRadius: 8,
     padding: 10, alignItems: "center",
   },
-  exitChipLabel: { fontSize: 10, color: colors.textMuted, fontWeight: "600", marginBottom: 4, textTransform: "uppercase" },
-  exitChipValue: { fontSize: 16, fontWeight: "800" },
+  exitChipLabel: { fontSize: 10, color: colors.textMuted, fontFamily: "Inter_600SemiBold", marginBottom: 4, textTransform: "uppercase" },
+  exitChipValue: { fontSize: 16, fontFamily: "Inter_800ExtraBold" },
   actions: { marginTop: 8, gap: 12 },
   alertButton: {
     backgroundColor: colors.accent, padding: 16,
     alignItems: "center", borderRadius: layout.buttonRadius,
   },
-  alertButtonText: { color: "#000", fontWeight: "800", fontSize: 16 },
+  alertButtonText: { color: "#000", fontFamily: "Inter_800ExtraBold", fontSize: 16 },
   editButton: {
     borderWidth: 1, borderColor: colors.border, padding: 16,
     alignItems: "center", borderRadius: layout.buttonRadius,
   },
-  editButtonText: { color: colors.textPrimary, fontWeight: "700", fontSize: 16 },
+  editButtonText: { color: colors.textPrimary, fontFamily: "Inter_700Bold", fontSize: 16 },
 });

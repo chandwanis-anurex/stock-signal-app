@@ -95,11 +95,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentDim, borderWidth: 1, borderColor: colors.accent,
     borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4,
   },
-  chipText: { color: colors.accent, fontWeight: "700", fontSize: 13 },
+  chipText: { color: colors.accent, fontFamily: "Inter_700Bold", fontSize: 13 },
   saveButton: {
     backgroundColor: colors.accent, padding: 16, alignItems: "center",
     borderRadius: layout.buttonRadius, marginTop: 28, marginBottom: 40,
   },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { color: "#000", fontWeight: "800", fontSize: 16 },
+  saveButtonText: { color: "#000", fontFamily: "Inter_800ExtraBold", fontSize: 16 },
 });

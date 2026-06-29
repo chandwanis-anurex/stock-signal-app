@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   cardTitle: { ...typography.heading3 },
   cardArrow: { fontSize: 22, color: colors.textSecondary },
   addButton: { padding: 12, alignItems: "center", marginBottom: 8 },
-  addButtonText: { color: colors.accent, fontWeight: "700", fontSize: 15 },
+  addButtonText: { color: colors.accent, fontFamily: "Inter_700Bold", fontSize: 15 },
   symbolGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 24 },
   symbolChip: {
     backgroundColor: colors.card,
@@ -98,6 +98,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: "center",
   },
-  symbolText: { ...typography.body, fontWeight: "700" },
+  symbolText: { ...typography.body, fontFamily: "Inter_700Bold" },
   symbolExchange: { fontSize: 10, color: colors.textMuted, marginTop: 2 },
 });
