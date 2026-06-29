@@ -60,6 +60,12 @@ export const api = {
   listAlertChannels: (watchlistId, ruleId) =>
     request(`/watchlists/${watchlistId}/rules/${ruleId}/alert-channels`),
 
+  updateAlertChannel: (watchlistId, ruleId, channelId, channelType, destination) =>
+    request(`/watchlists/${watchlistId}/rules/${ruleId}/alert-channels/${channelId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ channel_type: channelType, destination }),
+    }),
+
   testAlertChannel: (watchlistId, ruleId, channelId) =>
     request(`/watchlists/${watchlistId}/rules/${ruleId}/alert-channels/${channelId}/test`, { method: "POST" }),
 

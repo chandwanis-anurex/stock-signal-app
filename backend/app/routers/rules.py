@@ -49,6 +49,17 @@ def list_alert_channels(watchlist_id: int, rule_id: int, db: Session = Depends(g
     return [{"id": c.id, "channel_type": c.channel_type, "destination": c.destination, "active": c.active} for c in channels]
 
 
+@router.patch("/{rule_id}/alert-channels/{channel_id}")
+def update_alert_channel(watchlist_id: int, rule_id: int, channel_id: int, payload: AlertChannelCreate, db: Session = Depends(get_db)):
+    from fastapi import HTTPException
+    channel = db.query(AlertChannel).filter(AlertChannel.id == channel_id).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    channel.destination = payload.destination
+    db.commit()
+    return {"id": channel.id, "channel_type": channel.channel_type, "destination": channel.destination}
+
+
 @router.post("/{rule_id}/alert-channels/{channel_id}/test")
 def test_alert_channel(watchlist_id: int, rule_id: int, channel_id: int, db: Session = Depends(get_db)):
     from fastapi import HTTPException

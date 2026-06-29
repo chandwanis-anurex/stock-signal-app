@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { api } from "../api/client";
@@ -70,8 +70,11 @@ export default function AlertChannelsScreen({ route, navigation }) {
   const save = async () => {
     try {
       const jobs = CHANNELS
-        .filter((c) => enabled[c.type] && destinations[c.type] && !existingIds[c.type])
-        .map((c) => api.addAlertChannel(watchlistId, ruleId, c.type, destinations[c.type]));
+        .filter((c) => enabled[c.type] && destinations[c.type])
+        .map((c) => existingIds[c.type]
+          ? api.updateAlertChannel(watchlistId, ruleId, existingIds[c.type], c.type, destinations[c.type])
+          : api.addAlertChannel(watchlistId, ruleId, c.type, destinations[c.type])
+        );
       await Promise.all(jobs);
       Alert.alert("Saved", "Alert channels configured.");
       navigation.popToTop();
@@ -81,6 +84,7 @@ export default function AlertChannelsScreen({ route, navigation }) {
   };
 
   return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>{ruleName}</Text>
       <Text style={styles.subtitle}>Choose where to receive alerts for this rule.</Text>
@@ -132,6 +136,7 @@ export default function AlertChannelsScreen({ route, navigation }) {
         <Text style={styles.saveButtonText}>Save Alert Channels</Text>
       </TouchableOpacity>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
