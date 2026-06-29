@@ -52,17 +52,24 @@ def send_push(device_token: str, title: str, message: str):
 
 
 def send_webhook(url: str, signal: Signal):
-    httpx.post(
-        url,
-        json={
+    if "traderspost" in url.lower():
+        payload = {
+            "ticker": signal.symbol,
+            "action": signal.side,
+            "price": signal.price_at_signal,
+            "sentiment": "bullish" if signal.side == "buy" else "bearish",
+        }
+    else:
+        payload = {
             "symbol": signal.symbol,
             "side": signal.side,
             "price": signal.price_at_signal,
             "fired_at": signal.fired_at.isoformat(),
             "indicator_snapshot": signal.indicator_snapshot,
-        },
-        timeout=10,
-    )
+        }
+
+    response = httpx.post(url, json=payload, timeout=10)
+    response.raise_for_status()
 
 
 def dispatch(channel: AlertChannel, signal: Signal):
