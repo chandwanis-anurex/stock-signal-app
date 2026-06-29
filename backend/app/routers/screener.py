@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.models import User, Watchlist, WatchlistSymbol
 from app.schemas import ScreenerCriteria, WatchlistCreate
 from app.services.screener_service import run_screener
+from app.services.market_data import get_provider
 
 router = APIRouter(prefix="/screener", tags=["screener"])
 
@@ -60,8 +61,10 @@ def create_watchlist_manual(payload: dict, db: Session = Depends(get_db), curren
     db.add(wl)
     db.commit()
     db.refresh(wl)
+    provider = get_provider()
     for sym in symbols:
-        db.add(WatchlistSymbol(watchlist_id=wl.id, symbol=sym, exchange=""))
+        company_name = provider.get_company_name(sym)
+        db.add(WatchlistSymbol(watchlist_id=wl.id, symbol=sym, exchange="", company_name=company_name))
     db.commit()
     return {"id": wl.id, "name": wl.name}
 

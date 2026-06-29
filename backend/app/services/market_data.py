@@ -20,6 +20,9 @@ class MarketDataProvider:
     def get_latest_price(self, symbol: str) -> float:
         raise NotImplementedError
 
+    def get_company_name(self, symbol: str) -> str:
+        return ""
+
 
 class PolygonProvider(MarketDataProvider):
     BASE_URL = "https://api.polygon.io"
@@ -46,6 +49,16 @@ class PolygonProvider(MarketDataProvider):
         resp = httpx.get(url, params={"apiKey": self.api_key})
         resp.raise_for_status()
         return resp.json()["results"]["p"]
+
+    def get_company_name(self, symbol: str) -> str:
+        try:
+            url = f"{self.BASE_URL}/v3/reference/tickers/{symbol.upper()}"
+            resp = httpx.get(url, params={"apiKey": self.api_key}, timeout=5)
+            if resp.status_code == 200:
+                return resp.json().get("results", {}).get("name", "")
+        except Exception:
+            pass
+        return ""
 
 
 class AlpacaProvider(MarketDataProvider):

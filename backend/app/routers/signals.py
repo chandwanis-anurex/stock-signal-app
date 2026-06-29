@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.models import Signal, Rule, WatchlistSymbol
+from app.services.market_data import get_provider
 from app.services.analytics_service import rule_performance_summary
 
 router = APIRouter(prefix="/signals", tags=["signals"])
@@ -33,9 +34,23 @@ def list_signals(
 
     symbol_set = {s.symbol for s in signals}
     company_map = {}
-    for ws in db.query(WatchlistSymbol).filter(WatchlistSymbol.symbol.in_(symbol_set)).all():
-        if ws.company_name and ws.symbol not in company_map:
-            company_map[ws.symbol] = ws.company_name
+    ws_rows = {ws.symbol: ws for ws in db.query(WatchlistSymbol).filter(WatchlistSymbol.symbol.in_(symbol_set)).all()}
+    for sym, ws in ws_rows.items():
+        if ws.company_name:
+            company_map[sym] = ws.company_name
+
+    # For any symbol still missing a name, fetch from Polygon and cache it
+    missing = symbol_set - set(company_map.keys())
+    if missing:
+        provider = get_provider()
+        for sym in missing:
+            name = provider.get_company_name(sym)
+            if name:
+                company_map[sym] = name
+                if sym in ws_rows:
+                    ws_rows[sym].company_name = name
+        if missing:
+            db.commit()
 
     return [
         {
