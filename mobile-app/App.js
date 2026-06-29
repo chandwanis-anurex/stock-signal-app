@@ -32,12 +32,15 @@ const navTheme = {
   },
 };
 
+const headerLogo = () => <Logo size={36} style={{ marginRight: 12 }} />;
+
 const stackScreenOptions = {
   headerStyle: { backgroundColor: colors.card },
   headerTintColor: colors.textPrimary,
   headerTitleStyle: { fontWeight: "700" },
   headerBackTitle: "",
   headerBackTitleVisible: false,
+  headerRight: headerLogo,
 };
 
 function WatchlistsStack() {
@@ -83,6 +86,7 @@ function MainApp({ onLogout }) {
         headerStyle: { backgroundColor: colors.card },
         headerTintColor: colors.textPrimary,
         headerTitleStyle: { fontWeight: "700" },
+        headerRight: headerLogo,
       }}
     >
       <Tabs.Screen
