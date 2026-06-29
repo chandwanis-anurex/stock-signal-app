@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from "react";
-import { View, Text, FlatList, StyleSheet, RefreshControl } from "react-native";
+import React, { useCallback, useRef, useState } from "react";
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Animated } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { api } from "../api/client";
 import { colors, typography, layout } from "../theme";
 import { getCompanyName } from "../data/companyNames";
@@ -26,8 +27,23 @@ export default function SignalFeedScreen() {
     setRefreshing(false);
   };
 
+  const deleteSignal = async (id) => {
+    try {
+      await api.deleteSignal(id);
+      setSignals((prev) => prev.filter((s) => s.id !== id));
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
+  const renderRightActions = (id) => (
+    <TouchableOpacity style={styles.deleteAction} onPress={() => deleteSignal(id)}>
+      <Text style={styles.deleteActionText}>Delete</Text>
+    </TouchableOpacity>
+  );
+
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <FlatList
         data={signals}
         keyExtractor={(item) => String(item.id)}
@@ -40,21 +56,23 @@ export default function SignalFeedScreen() {
           const dateStr = firedAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
           const timeStr = firedAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
           return (
-            <View style={styles.card}>
-              <View style={[styles.badge, isBuy ? styles.buyBadge : styles.sellBadge]}>
-                <Text style={styles.badgeText}>{isBuy ? "BUY" : "SELL"}</Text>
+            <Swipeable renderRightActions={() => renderRightActions(item.id)} overshootRight={false}>
+              <View style={styles.card}>
+                <View style={[styles.badge, isBuy ? styles.buyBadge : styles.sellBadge]}>
+                  <Text style={styles.badgeText}>{isBuy ? "BUY" : "SELL"}</Text>
+                </View>
+                <View style={styles.cardBody}>
+                  <Text style={styles.symbol}>{item.symbol}</Text>
+                  {companyName ? <Text style={styles.companyName}>{companyName}</Text> : null}
+                  {item.rule_name ? <Text style={styles.ruleName}>{item.rule_name}</Text> : null}
+                </View>
+                <View style={styles.cardRight}>
+                  <Text style={styles.price}>${item.price_at_signal?.toFixed(2) ?? "—"}</Text>
+                  <Text style={styles.time}>{dateStr}</Text>
+                  <Text style={styles.time}>{timeStr}</Text>
+                </View>
               </View>
-              <View style={styles.cardBody}>
-                <Text style={styles.symbol}>{item.symbol}</Text>
-                {companyName ? <Text style={styles.companyName}>{companyName}</Text> : null}
-                {item.rule_name ? <Text style={styles.ruleName}>{item.rule_name}</Text> : null}
-              </View>
-              <View style={styles.cardRight}>
-                <Text style={styles.price}>${item.price_at_signal?.toFixed(2) ?? "—"}</Text>
-                <Text style={styles.time}>{dateStr}</Text>
-                <Text style={styles.time}>{timeStr}</Text>
-              </View>
-            </View>
+            </Swipeable>
           );
         }}
         ListEmptyComponent={
@@ -65,7 +83,7 @@ export default function SignalFeedScreen() {
           </View>
         }
       />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -100,6 +118,12 @@ const styles = StyleSheet.create({
   cardRight: { alignItems: "flex-end" },
   price: { fontSize: 15, fontFamily: "Inter_700Bold", color: colors.textPrimary },
   time: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  deleteAction: {
+    backgroundColor: colors.sell, justifyContent: "center",
+    alignItems: "center", width: 80, borderRadius: layout.cardRadius,
+    marginBottom: 10,
+  },
+  deleteActionText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 14 },
   emptyState: { alignItems: "center", marginTop: 80, paddingHorizontal: 32 },
   emptyIcon: { fontSize: 40, marginBottom: 16 },
   emptyTitle: { ...typography.heading3, marginBottom: 8 },

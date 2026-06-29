@@ -66,6 +66,17 @@ def list_signals(
     ]
 
 
+@router.delete("/{signal_id}")
+def delete_signal(signal_id: int, db: Session = Depends(get_db)):
+    from fastapi import HTTPException
+    signal = db.query(Signal).filter(Signal.id == signal_id).first()
+    if not signal:
+        raise HTTPException(status_code=404, detail="Signal not found")
+    db.delete(signal)
+    db.commit()
+    return {"deleted": signal_id}
+
+
 @router.get("/rules/{rule_id}/performance")
 def rule_performance(rule_id: int, db: Session = Depends(get_db)):
     return rule_performance_summary(db, rule_id)

@@ -81,6 +81,9 @@ export const api = {
       body: JSON.stringify({ channel_type: channelType, destination }),
     }),
 
+  deleteSignal: (signalId) =>
+    request(`/signals/${signalId}`, { method: "DELETE" }),
+
   listSignals: (ruleId, symbol) => {
     const params = new URLSearchParams();
     if (ruleId) params.append("rule_id", ruleId);
