@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import { NavigationContainer, DarkTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { auth } from "./api/client";
+import { colors } from "./theme";
 import AuthScreen from "./screens/AuthScreen";
 import WatchlistsScreen from "./screens/WatchlistsScreen";
 import CriteriaBuilderScreen from "./screens/CriteriaBuilderScreen";
@@ -17,31 +18,33 @@ import AnalyticsScreen from "./screens/AnalyticsScreen";
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
 
+const navTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: colors.bg,
+    card: colors.card,
+    border: colors.border,
+    primary: colors.accent,
+    text: colors.textPrimary,
+  },
+};
+
+const stackScreenOptions = {
+  headerStyle: { backgroundColor: colors.card },
+  headerTintColor: colors.textPrimary,
+  headerTitleStyle: { fontWeight: "700" },
+};
+
 function WatchlistsStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator screenOptions={stackScreenOptions}>
       <Stack.Screen name="Watchlists" component={WatchlistsScreen} options={{ title: "Watchlists" }} />
       <Stack.Screen name="CriteriaBuilder" component={CriteriaBuilderScreen} options={{ title: "New Watchlist" }} />
       <Stack.Screen name="WatchlistDetail" component={WatchlistDetailScreen} options={{ title: "Watchlist" }} />
       <Stack.Screen name="RuleBuilder" component={RuleBuilderScreen} options={{ title: "New Rule" }} />
       <Stack.Screen name="AlertChannels" component={AlertChannelsScreen} options={{ title: "Alert Channels" }} />
     </Stack.Navigator>
-  );
-}
-
-function MainApp({ onLogout }) {
-  return (
-    <Tabs.Navigator>
-      <Tabs.Screen name="WatchlistsTab" component={WatchlistsStack} options={{ title: "Watchlists", headerShown: false }} />
-      <Tabs.Screen name="Signals" component={SignalFeedScreen} />
-      <Tabs.Screen name="Analytics" component={AnalyticsScreen} />
-      <Tabs.Screen
-        name="Account"
-        options={{ title: "Account" }}
-      >
-        {() => <AccountScreen onLogout={onLogout} />}
-      </Tabs.Screen>
-    </Tabs.Navigator>
   );
 }
 
@@ -52,14 +55,41 @@ function AccountScreen({ onLogout }) {
   };
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
-      <TouchableOpacity
-        onPress={logout}
-        style={{ backgroundColor: "#e53935", padding: 16, borderRadius: 8, paddingHorizontal: 32 }}
-      >
-        <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>Sign Out</Text>
+    <View style={styles.accountScreen}>
+      <View style={styles.accountCard}>
+        <Text style={styles.accountTitle}>Account</Text>
+        <Text style={styles.accountSubtitle}>SignalFlow</Text>
+      </View>
+      <TouchableOpacity onPress={logout} style={styles.signOutButton}>
+        <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
     </View>
+  );
+}
+
+function MainApp({ onLogout }) {
+  return (
+    <Tabs.Navigator
+      screenOptions={{
+        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border },
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textSecondary,
+        headerStyle: { backgroundColor: colors.card },
+        headerTintColor: colors.textPrimary,
+        headerTitleStyle: { fontWeight: "700" },
+      }}
+    >
+      <Tabs.Screen
+        name="WatchlistsTab"
+        component={WatchlistsStack}
+        options={{ title: "Watchlists", headerShown: false, tabBarLabel: "Watchlists" }}
+      />
+      <Tabs.Screen name="Signals" component={SignalFeedScreen} options={{ title: "Signals" }} />
+      <Tabs.Screen name="Analytics" component={AnalyticsScreen} options={{ title: "Analytics" }} />
+      <Tabs.Screen name="Account" options={{ title: "Account" }}>
+        {() => <AccountScreen onLogout={onLogout} />}
+      </Tabs.Screen>
+    </Tabs.Navigator>
   );
 }
 
@@ -76,8 +106,8 @@ export default function App() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#1a73e8" />
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -87,8 +117,24 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navTheme}>
       <MainApp onLogout={() => setAuthenticated(false)} />
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  loading: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.bg },
+  accountScreen: { flex: 1, backgroundColor: colors.bg, padding: 16 },
+  accountCard: {
+    backgroundColor: colors.card, borderRadius: 12, borderWidth: 1,
+    borderColor: colors.border, padding: 20, marginBottom: 24, alignItems: "center",
+  },
+  accountTitle: { fontSize: 20, fontWeight: "700", color: colors.textPrimary },
+  accountSubtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 4 },
+  signOutButton: {
+    backgroundColor: colors.danger + "22", borderWidth: 1, borderColor: colors.danger,
+    padding: 16, borderRadius: 10, alignItems: "center",
+  },
+  signOutText: { color: colors.danger, fontWeight: "700", fontSize: 16 },
+});

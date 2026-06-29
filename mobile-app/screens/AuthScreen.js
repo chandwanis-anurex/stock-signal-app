@@ -4,16 +4,17 @@ import {
   StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView,
 } from "react-native";
 import { api, auth } from "../api/client";
+import { colors, typography, layout } from "../theme";
 
 export default function AuthScreen({ onAuthenticated }) {
-  const [mode, setMode] = useState("login"); // "login" | "register"
+  const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert("Both email and password are required");
+      Alert.alert("Missing fields", "Both email and password are required.");
       return;
     }
     setLoading(true);
@@ -33,52 +34,121 @@ export default function AuthScreen({ onAuthenticated }) {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Stock Signal App</Text>
-        <Text style={styles.subtitle}>{mode === "login" ? "Sign in to your account" : "Create an account"}</Text>
 
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="you@example.com"
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
+        <View style={styles.logoArea}>
+          <View style={styles.logoMark}>
+            <Text style={styles.logoIcon}>▲</Text>
+          </View>
+          <Text style={styles.appName}>SignalFlow</Text>
+          <Text style={styles.tagline}>Algorithmic stock alerts, simplified</Text>
+        </View>
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Password"
-          secureTextEntry
-        />
+        <View style={styles.card}>
+          <View style={styles.modeToggle}>
+            <TouchableOpacity
+              style={[styles.modeTab, mode === "login" && styles.modeTabActive]}
+              onPress={() => setMode("login")}
+            >
+              <Text style={[styles.modeTabText, mode === "login" && styles.modeTabTextActive]}>Sign In</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeTab, mode === "register" && styles.modeTabActive]}
+              onPress={() => setMode("register")}
+            >
+              <Text style={[styles.modeTabText, mode === "register" && styles.modeTabTextActive]}>Register</Text>
+            </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity style={styles.button} onPress={submit} disabled={loading}>
-          <Text style={styles.buttonText}>
-            {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
-          </Text>
-        </TouchableOpacity>
+          <Text style={styles.inputLabel}>Email</Text>
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
 
-        <TouchableOpacity onPress={() => setMode(mode === "login" ? "register" : "login")}>
-          <Text style={styles.toggle}>
-            {mode === "login" ? "No account? Register" : "Already have an account? Sign in"}
-          </Text>
-        </TouchableOpacity>
+          <Text style={styles.inputLabel}>Password</Text>
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="••••••••"
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+          />
+
+          <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={submit} disabled={loading}>
+            <Text style={styles.buttonText}>
+              {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.footer}>Market data powered by Alpaca</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: "#fff" },
+  flex: { flex: 1, backgroundColor: colors.bg },
   container: { flexGrow: 1, padding: 24, justifyContent: "center" },
-  title: { fontSize: 26, fontWeight: "800", textAlign: "center", marginBottom: 6, color: "#111" },
-  subtitle: { fontSize: 14, color: "#777", textAlign: "center", marginBottom: 32 },
-  label: { fontSize: 13, color: "#555", marginBottom: 4 },
-  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 8, padding: 12, marginBottom: 16 },
-  button: { backgroundColor: "#1a73e8", padding: 16, alignItems: "center", borderRadius: 8, marginTop: 8 },
-  buttonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  toggle: { color: "#1a73e8", textAlign: "center", marginTop: 20, fontWeight: "600" },
+
+  logoArea: { alignItems: "center", marginBottom: 40 },
+  logoMark: {
+    width: 64, height: 64, borderRadius: 20,
+    backgroundColor: colors.accent, alignItems: "center", justifyContent: "center",
+    marginBottom: 16,
+  },
+  logoIcon: { fontSize: 28, color: "#000", fontWeight: "900" },
+  appName: { fontSize: 32, fontWeight: "800", color: colors.textPrimary, letterSpacing: -1 },
+  tagline: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
+
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: layout.cardRadius,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 20,
+    marginBottom: 24,
+  },
+
+  modeToggle: {
+    flexDirection: "row",
+    backgroundColor: colors.bg,
+    borderRadius: layout.inputRadius,
+    padding: 4,
+    marginBottom: 24,
+  },
+  modeTab: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 6 },
+  modeTabActive: { backgroundColor: colors.accent },
+  modeTabText: { fontSize: 14, fontWeight: "600", color: colors.textSecondary },
+  modeTabTextActive: { color: "#000" },
+
+  inputLabel: { ...typography.label, marginBottom: 6 },
+  input: {
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: layout.inputRadius,
+    padding: 14,
+    color: colors.textPrimary,
+    fontSize: 15,
+    marginBottom: 16,
+  },
+
+  button: {
+    backgroundColor: colors.accent,
+    padding: 16,
+    alignItems: "center",
+    borderRadius: layout.buttonRadius,
+    marginTop: 4,
+  },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { color: "#000", fontWeight: "800", fontSize: 16 },
+
+  footer: { textAlign: "center", color: colors.textMuted, fontSize: 12 },
 });

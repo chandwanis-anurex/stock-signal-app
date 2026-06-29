@@ -9,8 +9,10 @@
       "bundleIdentifier": "com.yourcompany.stocksignalapp",
       "infoPlist": {
         "UIBackgroundModes": [
+          "remote-notification",
           "remote-notification"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "plugins": [
