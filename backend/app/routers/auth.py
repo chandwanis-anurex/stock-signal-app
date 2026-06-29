@@ -38,19 +38,3 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return {"token": create_token(user.id), "user_id": user.id, "email": user.email}
 
 
-class ResetRequest(BaseModel):
-    email: str
-    new_password: str
-    admin_key: str
-
-
-@router.post("/reset-password")
-def reset_password(payload: ResetRequest, db: Session = Depends(get_db)):
-    if payload.admin_key != "reset-stock-signal-2026":
-        raise HTTPException(status_code=403, detail="Forbidden")
-    user = db.query(User).filter(User.email == payload.email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    user.hashed_password = hash_password(payload.new_password)
-    db.commit()
-    return {"message": "Password reset successfully"}
