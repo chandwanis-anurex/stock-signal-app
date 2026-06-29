@@ -39,6 +39,22 @@ function ConditionBlock({ condition, side }) {
           </View>
         );
       })}
+      {side === "sell" && (condition.take_profit_pct != null || condition.stop_loss_pct != null) && (
+        <View style={styles.exitTargetsRow}>
+          {condition.take_profit_pct != null && (
+            <View style={styles.exitChip}>
+              <Text style={styles.exitChipLabel}>Take Profit</Text>
+              <Text style={[styles.exitChipValue, { color: colors.buy }]}>+{condition.take_profit_pct}%</Text>
+            </View>
+          )}
+          {condition.stop_loss_pct != null && (
+            <View style={styles.exitChip}>
+              <Text style={styles.exitChipLabel}>Stop Loss</Text>
+              <Text style={[styles.exitChipValue, { color: colors.sell }]}>-{condition.stop_loss_pct}%</Text>
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -111,6 +127,16 @@ const styles = StyleSheet.create({
   termOperator: { ...typography.bodySmall, flex: 1, textAlign: "center" },
   termValue: { ...typography.body, color: colors.accent, fontWeight: "700", flex: 1, textAlign: "right" },
 
+  exitTargetsRow: {
+    flexDirection: "row", gap: 10, padding: 12,
+    borderTopWidth: 1, borderTopColor: colors.border,
+  },
+  exitChip: {
+    flex: 1, backgroundColor: colors.cardAlt, borderRadius: 8,
+    padding: 10, alignItems: "center",
+  },
+  exitChipLabel: { fontSize: 10, color: colors.textMuted, fontWeight: "600", marginBottom: 4, textTransform: "uppercase" },
+  exitChipValue: { fontSize: 16, fontWeight: "800" },
   actions: { marginTop: 8, gap: 12 },
   alertButton: {
     backgroundColor: colors.accent, padding: 16,

@@ -92,6 +92,12 @@ export default function RuleBuilderScreen({ route, navigation }) {
   const [sellTerms, setSellTerms] = useState(
     existingRule?.sell_condition?.terms ?? [{ indicator: "RSI", params: { period: 14 }, operator: "gt", value: "70" }]
   );
+  const [takeProfitPct, setTakeProfitPct] = useState(
+    existingRule?.sell_condition?.take_profit_pct != null ? String(existingRule.sell_condition.take_profit_pct) : ""
+  );
+  const [stopLossPct, setStopLossPct] = useState(
+    existingRule?.sell_condition?.stop_loss_pct != null ? String(existingRule.sell_condition.stop_loss_pct) : ""
+  );
 
   React.useEffect(() => {
     navigation.setOptions({ title: isEditing ? existingRule.name : "New Rule" });
@@ -109,10 +115,13 @@ export default function RuleBuilderScreen({ route, navigation }) {
     if (!name.trim()) { Alert.alert("Name required"); return; }
     try {
       const toNum = (terms) => terms.map((t) => ({ ...t, value: isNaN(t.value) ? t.value : Number(t.value) }));
+      const sellCondition = { logic: "and", terms: toNum(sellTerms) };
+      if (takeProfitPct !== "") sellCondition.take_profit_pct = parseFloat(takeProfitPct);
+      if (stopLossPct !== "") sellCondition.stop_loss_pct = parseFloat(stopLossPct);
       const rule = await api.createRule(
         watchlistId, name,
         { logic: "and", terms: toNum(buyTerms) },
-        { logic: "and", terms: toNum(sellTerms) },
+        sellCondition,
       );
       navigation.replace("AlertChannels", { watchlistId, ruleId: rule.id, ruleName: rule.name });
     } catch (e) {
@@ -159,6 +168,41 @@ export default function RuleBuilderScreen({ route, navigation }) {
         <Text style={styles.addButtonText}>+ Add Sell Condition</Text>
       </TouchableOpacity>
 
+      <View style={styles.exitCard}>
+        <Text style={styles.exitCardTitle}>Exit Targets</Text>
+        <Text style={styles.sectionHint}>Auto-sell when price moves this % from entry</Text>
+        <View style={styles.exitRow}>
+          <View style={styles.exitField}>
+            <Text style={styles.exitLabel}>Take Profit %</Text>
+            <View style={styles.exitInputWrapper}>
+              <TextInput
+                style={styles.exitInput}
+                value={takeProfitPct}
+                onChangeText={setTakeProfitPct}
+                placeholder="e.g. 10"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="decimal-pad"
+              />
+              <Text style={styles.exitUnit}>%</Text>
+            </View>
+          </View>
+          <View style={styles.exitField}>
+            <Text style={styles.exitLabel}>Stop Loss %</Text>
+            <View style={styles.exitInputWrapper}>
+              <TextInput
+                style={styles.exitInput}
+                value={stopLossPct}
+                onChangeText={setStopLossPct}
+                placeholder="e.g. 5"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="decimal-pad"
+              />
+              <Text style={styles.exitUnit}>%</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
       <TouchableOpacity style={styles.saveButton} onPress={save}>
         <Text style={styles.saveButtonText}>Save Rule</Text>
       </TouchableOpacity>
@@ -187,6 +231,21 @@ const styles = StyleSheet.create({
   removeBtn: { color: colors.danger, fontSize: 13, fontWeight: "600" },
   addButton: { padding: 14, alignItems: "center", marginBottom: 4 },
   addButtonText: { color: colors.accent, fontWeight: "700", fontSize: 15 },
+  exitCard: {
+    backgroundColor: colors.card, borderRadius: layout.cardRadius,
+    borderWidth: 1, borderColor: colors.sell + "55", padding: 14, marginBottom: 12,
+  },
+  exitCardTitle: { fontSize: 13, fontWeight: "700", color: colors.sell, marginBottom: 2 },
+  exitRow: { flexDirection: "row", gap: 12, marginTop: 12 },
+  exitField: { flex: 1 },
+  exitLabel: { ...typography.label, marginBottom: 6 },
+  exitInputWrapper: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
+    borderRadius: layout.inputRadius, paddingHorizontal: 12,
+  },
+  exitInput: { flex: 1, paddingVertical: 12, color: colors.textPrimary, fontSize: 15 },
+  exitUnit: { color: colors.textSecondary, fontWeight: "700", fontSize: 15 },
   saveButton: {
     backgroundColor: colors.accent, padding: 16, alignItems: "center",
     borderRadius: layout.buttonRadius, marginVertical: 24,
