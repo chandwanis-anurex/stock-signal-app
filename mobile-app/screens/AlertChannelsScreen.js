@@ -114,7 +114,7 @@ export default function AlertChannelsScreen({ route, navigation }) {
           {c.type === "push" && enabled.push && (
             <Text style={styles.pushHint}>Device registered for push alerts.</Text>
           )}
-          {enabled[c.type] && existingIds[c.type] && (
+          {existingIds[c.type] && (
             <TouchableOpacity
               style={styles.testButton}
               onPress={() => testChannel(c.type)}
