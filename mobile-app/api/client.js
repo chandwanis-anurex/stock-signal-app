@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const API_BASE_URL = "http://192.168.68.64:8000";
+export const API_BASE_URL = "https://stock-signal-app-production-912e.up.railway.app";
 
 const TOKEN_KEY = "auth_token";
 

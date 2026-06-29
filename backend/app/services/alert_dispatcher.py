@@ -43,14 +43,11 @@ def send_email(destination: str, subject: str, message: str):
 
 
 def send_push(device_token: str, title: str, message: str):
-    fcm_key = os.getenv("FCM_SERVER_KEY")
     httpx.post(
-        "https://fcm.googleapis.com/fcm/send",
-        headers={"Authorization": f"key={fcm_key}", "Content-Type": "application/json"},
-        json={
-            "to": device_token,
-            "notification": {"title": title, "body": message},
-        },
+        "https://exp.host/--/api/v2/push/send",
+        headers={"Content-Type": "application/json"},
+        json={"to": device_token, "title": title, "body": message},
+        timeout=10,
     )
 
 

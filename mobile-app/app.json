@@ -8,9 +8,19 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.yourcompany.stocksignalapp",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
-    "plugins": ["expo-notifications"]
+    "plugins": [
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "704b6240-b34b-43ee-a76e-2be8ddade1e9"
+      }
+    },
+    "owner": "rakeshchandwani"
   }
 }

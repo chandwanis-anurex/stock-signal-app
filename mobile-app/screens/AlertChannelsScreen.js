@@ -22,7 +22,7 @@ export default function AlertChannelsScreen({ route, navigation }) {
       return;
     }
     const token = (await Notifications.getExpoPushTokenAsync({
-      projectId: "stock-signal-app",  // matches app.json slug — replace with EAS projectId when publishing
+      projectId: "704b6240-b34b-43ee-a76e-2be8ddade1e9",
     })).data;
     setDestinations((d) => ({ ...d, push: token }));
     setEnabled((e) => ({ ...e, push: true }));
