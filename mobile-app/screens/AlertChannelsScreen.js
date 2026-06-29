@@ -15,10 +15,13 @@ const CHANNELS = [
 export default function AlertChannelsScreen({ route, navigation }) {
   const { watchlistId, ruleId, ruleName } = route.params;
   const [destinations, setDestinations] = useState({});
+  const [savedDestinations, setSavedDestinations] = useState({});
   const [enabled, setEnabled] = useState({});
   const [existingIds, setExistingIds] = useState({});
+  const [testing, setTesting] = useState({});
+  const [saving, setSaving] = useState(false);
 
-  useFocusEffect(useCallback(() => {
+  const loadChannels = useCallback(() => {
     api.listAlertChannels(watchlistId, ruleId).then((channels) => {
       const dest = {}, en = {}, ids = {};
       channels.forEach((c) => {
@@ -27,10 +30,13 @@ export default function AlertChannelsScreen({ route, navigation }) {
         ids[c.channel_type] = c.id;
       });
       setDestinations(dest);
+      setSavedDestinations(dest);
       setEnabled(en);
       setExistingIds(ids);
     }).catch(console.warn);
-  }, [watchlistId, ruleId]));
+  }, [watchlistId, ruleId]);
+
+  useFocusEffect(useCallback(() => { loadChannels(); }, [loadChannels]));
 
   const registerForPush = async () => {
     try {
@@ -46,19 +52,20 @@ export default function AlertChannelsScreen({ route, navigation }) {
     }
   };
 
-  const [testing, setTesting] = useState({});
-
   const toggle = (type) => {
     if (type === "push" && !destinations.push) { registerForPush(); return; }
     setEnabled((e) => ({ ...e, [type]: !e[type] }));
   };
 
+  // Test button is active only when the current value matches what's saved
+  const isTestable = (type) =>
+    existingIds[type] && destinations[type] && destinations[type] === savedDestinations[type];
+
   const testChannel = async (type) => {
-    const channelId = existingIds[type];
-    if (!channelId) return;
+    if (!isTestable(type)) return;
     setTesting((t) => ({ ...t, [type]: true }));
     try {
-      await api.testAlertChannel(watchlistId, ruleId, channelId);
+      await api.testAlertChannel(watchlistId, ruleId, existingIds[type]);
       Alert.alert("Test sent", `A test ${type} alert was sent successfully.`);
     } catch (e) {
       Alert.alert("Test failed", e.message);
@@ -68,6 +75,7 @@ export default function AlertChannelsScreen({ route, navigation }) {
   };
 
   const save = async () => {
+    setSaving(true);
     try {
       const jobs = CHANNELS
         .filter((c) => enabled[c.type] && destinations[c.type])
@@ -76,66 +84,86 @@ export default function AlertChannelsScreen({ route, navigation }) {
           : api.addAlertChannel(watchlistId, ruleId, c.type, destinations[c.type])
         );
       await Promise.all(jobs);
-      Alert.alert("Saved", "Alert channels configured.");
-      navigation.popToTop();
+      // Reload so existingIds and savedDestinations are up to date
+      await api.listAlertChannels(watchlistId, ruleId).then((channels) => {
+        const dest = {}, en = {}, ids = {};
+        channels.forEach((c) => {
+          dest[c.channel_type] = c.destination;
+          en[c.channel_type] = c.active;
+          ids[c.channel_type] = c.id;
+        });
+        setDestinations(dest);
+        setSavedDestinations(dest);
+        setEnabled(en);
+        setExistingIds(ids);
+      });
+      Alert.alert("Saved", "Alert channels saved. You can now send a test.");
     } catch (e) {
       Alert.alert("Save failed", e.message);
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>{ruleName}</Text>
-      <Text style={styles.subtitle}>Choose where to receive alerts for this rule.</Text>
+      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+        <Text style={styles.title}>{ruleName}</Text>
+        <Text style={styles.subtitle}>Choose where to receive alerts for this rule.</Text>
 
-      {CHANNELS.map((c) => (
-        <View key={c.type} style={styles.channelCard}>
-          <View style={styles.channelHeader}>
-            <View style={styles.channelLeft}>
-              <Text style={styles.channelIcon}>{c.icon}</Text>
-              <Text style={styles.channelLabel}>{c.label}</Text>
+        {CHANNELS.map((c) => {
+          const dirty = destinations[c.type] !== savedDestinations[c.type];
+          const testable = isTestable(c.type);
+          return (
+            <View key={c.type} style={styles.channelCard}>
+              <View style={styles.channelHeader}>
+                <View style={styles.channelLeft}>
+                  <Text style={styles.channelIcon}>{c.icon}</Text>
+                  <Text style={styles.channelLabel}>{c.label}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.toggle, enabled[c.type] ? styles.toggleOn : styles.toggleOff]}
+                  onPress={() => toggle(c.type)}
+                >
+                  <Text style={[styles.toggleText, enabled[c.type] ? styles.toggleTextOn : styles.toggleTextOff]}>
+                    {enabled[c.type] ? "ON" : "OFF"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {c.type !== "push" && enabled[c.type] && (
+                <TextInput
+                  style={styles.input}
+                  placeholder={c.placeholder}
+                  placeholderTextColor={colors.textMuted}
+                  value={destinations[c.type] || ""}
+                  onChangeText={(v) => setDestinations((d) => ({ ...d, [c.type]: v }))}
+                  autoCapitalize="none"
+                />
+              )}
+              {c.type === "push" && enabled.push && (
+                <Text style={styles.pushHint}>Device registered for push alerts.</Text>
+              )}
+
+              {(existingIds[c.type] || dirty) && enabled[c.type] && destinations[c.type] ? (
+                <TouchableOpacity
+                  style={[styles.testButton, !testable && styles.testButtonDisabled]}
+                  onPress={() => testChannel(c.type)}
+                  disabled={!testable || testing[c.type]}
+                >
+                  <Text style={[styles.testButtonText, !testable && styles.testButtonTextDisabled]}>
+                    {testing[c.type] ? "Sending..." : dirty ? "Save first to test" : "Send Test"}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
-            <TouchableOpacity
-              style={[styles.toggle, enabled[c.type] ? styles.toggleOn : styles.toggleOff]}
-              onPress={() => toggle(c.type)}
-            >
-              <Text style={[styles.toggleText, enabled[c.type] ? styles.toggleTextOn : styles.toggleTextOff]}>
-                {enabled[c.type] ? "ON" : "OFF"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          {c.type !== "push" && enabled[c.type] && (
-            <TextInput
-              style={styles.input}
-              placeholder={c.placeholder}
-              placeholderTextColor={colors.textMuted}
-              value={destinations[c.type] || ""}
-              onChangeText={(v) => setDestinations((d) => ({ ...d, [c.type]: v }))}
-              autoCapitalize="none"
-            />
-          )}
-          {c.type === "push" && enabled.push && (
-            <Text style={styles.pushHint}>Device registered for push alerts.</Text>
-          )}
-          {existingIds[c.type] && (
-            <TouchableOpacity
-              style={styles.testButton}
-              onPress={() => testChannel(c.type)}
-              disabled={testing[c.type]}
-            >
-              <Text style={styles.testButtonText}>
-                {testing[c.type] ? "Sending..." : "Send Test"}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ))}
+          );
+        })}
 
-      <TouchableOpacity style={styles.saveButton} onPress={save}>
-        <Text style={styles.saveButtonText}>Save Alert Channels</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={save} disabled={saving}>
+          <Text style={styles.saveButtonText}>{saving ? "Saving..." : "Save Alert Channels"}</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -168,10 +196,13 @@ const styles = StyleSheet.create({
     marginTop: 10, borderWidth: 1, borderColor: colors.accent,
     borderRadius: layout.buttonRadius, padding: 10, alignItems: "center",
   },
+  testButtonDisabled: { borderColor: colors.textMuted },
   testButtonText: { color: colors.accent, fontWeight: "700", fontSize: 13 },
+  testButtonTextDisabled: { color: colors.textMuted },
   saveButton: {
     backgroundColor: colors.accent, padding: 16, alignItems: "center",
     borderRadius: layout.buttonRadius, marginVertical: 24,
   },
+  saveButtonDisabled: { opacity: 0.6 },
   saveButtonText: { color: "#000", fontWeight: "800", fontSize: 16 },
 });
