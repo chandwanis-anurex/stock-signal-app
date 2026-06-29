@@ -28,6 +28,12 @@ def list_rules(watchlist_id: int, db: Session = Depends(get_db)):
     return [{"id": r.id, "name": r.name, "active": r.active} for r in rules]
 
 
+@router.get("/{rule_id}/alert-channels")
+def list_alert_channels(watchlist_id: int, rule_id: int, db: Session = Depends(get_db)):
+    channels = db.query(AlertChannel).filter(AlertChannel.rule_id == rule_id).all()
+    return [{"id": c.id, "channel_type": c.channel_type, "destination": c.destination, "active": c.active} for c in channels]
+
+
 @router.post("/{rule_id}/alert-channels")
 def add_alert_channel(watchlist_id: int, rule_id: int, payload: AlertChannelCreate, db: Session = Depends(get_db)):
     channel = AlertChannel(

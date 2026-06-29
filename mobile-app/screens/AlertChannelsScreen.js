@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { api } from "../api/client";
 
@@ -14,18 +15,39 @@ export default function AlertChannelsScreen({ route, navigation }) {
   const { watchlistId, ruleId, ruleName } = route.params;
   const [destinations, setDestinations] = useState({});
   const [enabled, setEnabled] = useState({});
+  const [existingIds, setExistingIds] = useState({});
+
+  useFocusEffect(useCallback(() => {
+    api.listAlertChannels(watchlistId, ruleId).then((channels) => {
+      const dest = {};
+      const en = {};
+      const ids = {};
+      channels.forEach((c) => {
+        dest[c.channel_type] = c.destination;
+        en[c.channel_type] = c.active;
+        ids[c.channel_type] = c.id;
+      });
+      setDestinations(dest);
+      setEnabled(en);
+      setExistingIds(ids);
+    }).catch(console.warn);
+  }, [watchlistId, ruleId]));
 
   const registerForPush = async () => {
-    const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Push permission denied");
-      return;
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Push permission denied");
+        return;
+      }
+      const token = (await Notifications.getExpoPushTokenAsync({
+        projectId: "704b6240-b34b-43ee-a76e-2be8ddade1e9",
+      })).data;
+      setDestinations((d) => ({ ...d, push: token }));
+      setEnabled((e) => ({ ...e, push: true }));
+    } catch (e) {
+      Alert.alert("Push setup failed", e.message);
     }
-    const token = (await Notifications.getExpoPushTokenAsync({
-      projectId: "704b6240-b34b-43ee-a76e-2be8ddade1e9",
-    })).data;
-    setDestinations((d) => ({ ...d, push: token }));
-    setEnabled((e) => ({ ...e, push: true }));
   };
 
   const toggle = (type) => {
@@ -38,9 +60,9 @@ export default function AlertChannelsScreen({ route, navigation }) {
 
   const save = async () => {
     try {
-      const jobs = CHANNELS.filter((c) => enabled[c.type] && destinations[c.type]).map((c) =>
-        api.addAlertChannel(watchlistId, ruleId, c.type, destinations[c.type])
-      );
+      const jobs = CHANNELS
+        .filter((c) => enabled[c.type] && destinations[c.type] && !existingIds[c.type])
+        .map((c) => api.addAlertChannel(watchlistId, ruleId, c.type, destinations[c.type]));
       await Promise.all(jobs);
       Alert.alert("Saved", "Alert channels configured for this rule.");
       navigation.popToTop();
@@ -50,7 +72,7 @@ export default function AlertChannelsScreen({ route, navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>{ruleName}</Text>
       <Text style={styles.subtitle}>Choose where to send buy/sell alerts for this rule.</Text>
 
