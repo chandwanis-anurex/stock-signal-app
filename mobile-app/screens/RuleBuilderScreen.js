@@ -82,10 +82,20 @@ function TermCard({ term, index, onChange, onRemove, showRemove, side }) {
 }
 
 export default function RuleBuilderScreen({ route, navigation }) {
-  const { watchlistId } = route.params;
-  const [name, setName] = useState("");
-  const [buyTerms, setBuyTerms] = useState([{ indicator: "RSI", params: { period: 14 }, operator: "lt", value: "30" }]);
-  const [sellTerms, setSellTerms] = useState([{ indicator: "RSI", params: { period: 14 }, operator: "gt", value: "70" }]);
+  const { watchlistId, existingRule } = route.params;
+  const isEditing = !!existingRule;
+
+  const [name, setName] = useState(existingRule?.name ?? "");
+  const [buyTerms, setBuyTerms] = useState(
+    existingRule?.buy_condition?.terms ?? [{ indicator: "RSI", params: { period: 14 }, operator: "lt", value: "30" }]
+  );
+  const [sellTerms, setSellTerms] = useState(
+    existingRule?.sell_condition?.terms ?? [{ indicator: "RSI", params: { period: 14 }, operator: "gt", value: "70" }]
+  );
+
+  React.useEffect(() => {
+    navigation.setOptions({ title: isEditing ? existingRule.name : "New Rule" });
+  }, []);
 
   const updateTerm = (list, setList, index, updated) => {
     const next = [...list];

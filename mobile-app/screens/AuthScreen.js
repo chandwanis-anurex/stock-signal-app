@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import { api, auth } from "../api/client";
 import { colors, typography, layout } from "../theme";
+import Logo from "../components/Logo";
 
 export default function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState("login");
@@ -36,9 +37,7 @@ export default function AuthScreen({ onAuthenticated }) {
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
         <View style={styles.logoArea}>
-          <View style={styles.logoMark}>
-            <Text style={styles.logoIcon}>▲</Text>
-          </View>
+          <Logo size={80} />
           <Text style={styles.appName}>SignalFlow</Text>
           <Text style={styles.tagline}>Algorithmic stock alerts, simplified</Text>
         </View>

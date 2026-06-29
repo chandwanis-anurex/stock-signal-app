@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { auth } from "./api/client";
 import { colors } from "./theme";
+import Logo from "./components/Logo";
 import AuthScreen from "./screens/AuthScreen";
 import WatchlistsScreen from "./screens/WatchlistsScreen";
 import CriteriaBuilderScreen from "./screens/CriteriaBuilderScreen";
@@ -35,6 +36,8 @@ const stackScreenOptions = {
   headerStyle: { backgroundColor: colors.card },
   headerTintColor: colors.textPrimary,
   headerTitleStyle: { fontWeight: "700" },
+  headerBackTitle: "",
+  headerBackTitleVisible: false,
 };
 
 function WatchlistsStack() {
@@ -59,8 +62,9 @@ function AccountScreen({ onLogout }) {
   return (
     <View style={styles.accountScreen}>
       <View style={styles.accountCard}>
-        <Text style={styles.accountTitle}>Account</Text>
-        <Text style={styles.accountSubtitle}>SignalFlow</Text>
+        <Logo size={64} />
+        <Text style={styles.accountTitle}>SignalFlow</Text>
+        <Text style={styles.accountSubtitle}>Algorithmic stock alerts, simplified</Text>
       </View>
       <TouchableOpacity onPress={logout} style={styles.signOutButton}>
         <Text style={styles.signOutText}>Sign Out</Text>
@@ -130,10 +134,10 @@ const styles = StyleSheet.create({
   accountScreen: { flex: 1, backgroundColor: colors.bg, padding: 16 },
   accountCard: {
     backgroundColor: colors.card, borderRadius: 12, borderWidth: 1,
-    borderColor: colors.border, padding: 20, marginBottom: 24, alignItems: "center",
+    borderColor: colors.border, padding: 24, marginBottom: 24, alignItems: "center", gap: 12,
   },
-  accountTitle: { fontSize: 20, fontWeight: "700", color: colors.textPrimary },
-  accountSubtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 4 },
+  accountTitle: { fontSize: 22, fontWeight: "800", color: colors.textPrimary },
+  accountSubtitle: { fontSize: 14, color: colors.textSecondary },
   signOutButton: {
     backgroundColor: colors.danger + "22", borderWidth: 1, borderColor: colors.danger,
     padding: 16, borderRadius: 10, alignItems: "center",
