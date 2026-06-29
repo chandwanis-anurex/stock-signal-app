@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "Stock Signal App",
+    "name": "SignalFlow",
     "slug": "stock-signal-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#0a0a0f"
     },
     "ios": {
