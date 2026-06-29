@@ -1,37 +1,81 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
 import { api } from "../api/client";
+import { colors, typography, layout } from "../theme";
+import Dropdown from "../components/Dropdown";
 
-const INDICATORS = ["RSI", "SMA", "EMA", "MACD", "MACD_SIGNAL", "VOLUME", "VOLUME_SMA", "CLOSE"];
-const OPERATORS = ["gt", "gte", "lt", "lte", "crosses_above", "crosses_below"];
+const INDICATORS = [
+  { value: "RSI", label: "RSI", hasPeriod: true },
+  { value: "SMA", label: "SMA", hasPeriod: true },
+  { value: "EMA", label: "EMA", hasPeriod: true },
+  { value: "MACD", label: "MACD Line", hasPeriod: false },
+  { value: "MACD_SIGNAL", label: "MACD Signal", hasPeriod: false },
+  { value: "WILLIAMS_R", label: "Williams %R", hasPeriod: true },
+  { value: "ULTIMATE_OSC", label: "Ultimate Oscillator", hasPeriod: false },
+  { value: "VOLUME", label: "Volume", hasPeriod: false },
+  { value: "VOLUME_SMA", label: "Volume SMA", hasPeriod: true },
+  { value: "CLOSE", label: "Price (Close)", hasPeriod: false },
+  { value: "BB_UPPER", label: "Bollinger Band Upper", hasPeriod: true },
+  { value: "BB_LOWER", label: "Bollinger Band Lower", hasPeriod: true },
+];
 
-function TermRow({ term, onChange }) {
+const INDICATOR_OPTIONS = INDICATORS.map((i) => ({ value: i.value, label: i.label }));
+
+const OPERATORS = [
+  { value: "gt", label: "is greater than (>)" },
+  { value: "gte", label: "is greater than or equal (≥)" },
+  { value: "lt", label: "is less than (<)" },
+  { value: "lte", label: "is less than or equal (≤)" },
+  { value: "crosses_above", label: "crosses above" },
+  { value: "crosses_below", label: "crosses below" },
+];
+
+function TermCard({ term, index, onChange, onRemove, showRemove, side }) {
+  const meta = INDICATORS.find((i) => i.value === term.indicator);
   return (
-    <View style={styles.termRow}>
-      <TextInput
-        style={styles.termField}
+    <View style={styles.termCard}>
+      <View style={styles.termHeader}>
+        <View style={[styles.sideBadge, side === "buy" ? styles.buyBadge : styles.sellBadge]}>
+          <Text style={styles.sideBadgeText}>{side === "buy" ? "BUY" : "SELL"} {index + 1}</Text>
+        </View>
+        {showRemove && (
+          <TouchableOpacity onPress={onRemove}>
+            <Text style={styles.removeBtn}>Remove</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      <Dropdown
+        label="Indicator"
         value={term.indicator}
-        onChangeText={(v) => onChange({ ...term, indicator: v })}
-        placeholder="indicator"
+        options={INDICATOR_OPTIONS}
+        onChange={(v) => onChange({ ...term, indicator: v, params: { period: 14 } })}
       />
-      <TextInput
-        style={styles.termField}
-        value={String(term.params?.period ?? "")}
-        onChangeText={(v) => onChange({ ...term, params: { period: Number(v) || undefined } })}
-        placeholder="period"
-        keyboardType="numeric"
-      />
-      <TextInput
-        style={styles.termField}
+      {meta?.hasPeriod && (
+        <>
+          <Text style={styles.inputLabel}>Period</Text>
+          <TextInput
+            style={styles.input}
+            value={String(term.params?.period ?? 14)}
+            onChangeText={(v) => onChange({ ...term, params: { period: Number(v) || 14 } })}
+            keyboardType="numeric"
+            placeholderTextColor={colors.textMuted}
+          />
+        </>
+      )}
+      <Dropdown
+        label="Condition"
         value={term.operator}
-        onChangeText={(v) => onChange({ ...term, operator: v })}
-        placeholder="op"
+        options={OPERATORS}
+        onChange={(v) => onChange({ ...term, operator: v })}
       />
+      <Text style={styles.inputLabel}>Value</Text>
       <TextInput
-        style={styles.termField}
+        style={styles.input}
         value={String(term.value)}
         onChangeText={(v) => onChange({ ...term, value: v })}
-        placeholder="value"
+        placeholder="e.g. 30"
+        placeholderTextColor={colors.textMuted}
+        keyboardType="decimal-pad"
       />
     </View>
   );
@@ -49,15 +93,17 @@ export default function RuleBuilderScreen({ route, navigation }) {
     setList(next);
   };
 
+  const removeTerm = (list, setList, index) => setList(list.filter((_, i) => i !== index));
+
   const save = async () => {
-    if (!name.trim()) {
-      Alert.alert("Name required");
-      return;
-    }
+    if (!name.trim()) { Alert.alert("Name required"); return; }
     try {
-      const buyCondition = { logic: "and", terms: buyTerms.map((t) => ({ ...t, value: isNaN(t.value) ? t.value : Number(t.value) })) };
-      const sellCondition = { logic: "and", terms: sellTerms.map((t) => ({ ...t, value: isNaN(t.value) ? t.value : Number(t.value) })) };
-      const rule = await api.createRule(watchlistId, name, buyCondition, sellCondition);
+      const toNum = (terms) => terms.map((t) => ({ ...t, value: isNaN(t.value) ? t.value : Number(t.value) }));
+      const rule = await api.createRule(
+        watchlistId, name,
+        { logic: "and", terms: toNum(buyTerms) },
+        { logic: "and", terms: toNum(sellTerms) },
+      );
       navigation.replace("AlertChannels", { watchlistId, ruleId: rule.id, ruleName: rule.name });
     } catch (e) {
       Alert.alert("Save failed", e.message);
@@ -66,26 +112,42 @@ export default function RuleBuilderScreen({ route, navigation }) {
 
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.label}>Rule name</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. RSI mean reversion" />
+      <Text style={styles.inputLabel}>Rule Name</Text>
+      <TextInput
+        style={styles.input}
+        value={name}
+        onChangeText={setName}
+        placeholder="e.g. RSI Mean Reversion"
+        placeholderTextColor={colors.textMuted}
+      />
 
-      <Text style={styles.sectionTitle}>BUY when all are true</Text>
+      <Text style={styles.sectionLabel}>Buy Conditions</Text>
+      <Text style={styles.sectionHint}>Signal fires when ALL conditions are true</Text>
       {buyTerms.map((t, i) => (
-        <TermRow key={i} term={t} onChange={(updated) => updateTerm(buyTerms, setBuyTerms, i, updated)} />
+        <TermCard
+          key={i} term={t} index={i} side="buy"
+          showRemove={buyTerms.length > 1}
+          onChange={(u) => updateTerm(buyTerms, setBuyTerms, i, u)}
+          onRemove={() => removeTerm(buyTerms, setBuyTerms, i)}
+        />
       ))}
-      <TouchableOpacity onPress={() => setBuyTerms([...buyTerms, { indicator: "MACD", operator: "crosses_above", value: "0" }])}>
-        <Text style={styles.addLink}>+ Add buy condition</Text>
+      <TouchableOpacity style={styles.addButton} onPress={() => setBuyTerms([...buyTerms, { indicator: "MACD", params: {}, operator: "crosses_above", value: "0" }])}>
+        <Text style={styles.addButtonText}>+ Add Buy Condition</Text>
       </TouchableOpacity>
 
-      <Text style={styles.sectionTitle}>SELL when all are true</Text>
+      <Text style={styles.sectionLabel}>Sell Conditions</Text>
+      <Text style={styles.sectionHint}>Signal fires when ALL conditions are true</Text>
       {sellTerms.map((t, i) => (
-        <TermRow key={i} term={t} onChange={(updated) => updateTerm(sellTerms, setSellTerms, i, updated)} />
+        <TermCard
+          key={i} term={t} index={i} side="sell"
+          showRemove={sellTerms.length > 1}
+          onChange={(u) => updateTerm(sellTerms, setSellTerms, i, u)}
+          onRemove={() => removeTerm(sellTerms, setSellTerms, i)}
+        />
       ))}
-      <TouchableOpacity onPress={() => setSellTerms([...sellTerms, { indicator: "MACD", operator: "crosses_below", value: "0" }])}>
-        <Text style={styles.addLink}>+ Add sell condition</Text>
+      <TouchableOpacity style={styles.addButton} onPress={() => setSellTerms([...sellTerms, { indicator: "MACD", params: {}, operator: "crosses_below", value: "0" }])}>
+        <Text style={styles.addButtonText}>+ Add Sell Condition</Text>
       </TouchableOpacity>
-
-      <Text style={styles.hint}>Indicators: {INDICATORS.join(", ")}. Operators: {OPERATORS.join(", ")}.</Text>
 
       <TouchableOpacity style={styles.saveButton} onPress={save}>
         <Text style={styles.saveButtonText}>Save Rule</Text>
@@ -95,14 +157,29 @@ export default function RuleBuilderScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 16 },
-  label: { fontSize: 13, color: "#555", marginTop: 12, marginBottom: 4 },
-  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 8, padding: 10 },
-  sectionTitle: { fontSize: 14, fontWeight: "700", marginTop: 20, marginBottom: 8 },
-  termRow: { flexDirection: "row", gap: 6, marginBottom: 6 },
-  termField: { flex: 1, borderWidth: 1, borderColor: "#ddd", borderRadius: 8, padding: 8, fontSize: 12 },
-  addLink: { color: "#1a73e8", fontWeight: "600", marginTop: 4 },
-  hint: { fontSize: 11, color: "#999", marginTop: 16 },
-  saveButton: { backgroundColor: "#1a73e8", padding: 16, alignItems: "center", borderRadius: 8, marginVertical: 24 },
-  saveButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  container: { flex: 1, backgroundColor: colors.bg, padding: layout.screenPadding },
+  inputLabel: { ...typography.label, marginBottom: 6 },
+  input: {
+    backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
+    borderRadius: layout.inputRadius, padding: 14, color: colors.textPrimary, fontSize: 15, marginBottom: 12,
+  },
+  sectionLabel: { ...typography.label, marginTop: 20, marginBottom: 4 },
+  sectionHint: { ...typography.bodySmall, marginBottom: 12 },
+  termCard: {
+    backgroundColor: colors.card, borderRadius: layout.cardRadius,
+    borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 12,
+  },
+  termHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  sideBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  buyBadge: { backgroundColor: colors.buy + "22", borderWidth: 1, borderColor: colors.buy },
+  sellBadge: { backgroundColor: colors.sell + "22", borderWidth: 1, borderColor: colors.sell },
+  sideBadgeText: { fontSize: 11, fontWeight: "700", color: colors.textPrimary },
+  removeBtn: { color: colors.danger, fontSize: 13, fontWeight: "600" },
+  addButton: { padding: 14, alignItems: "center", marginBottom: 4 },
+  addButtonText: { color: colors.accent, fontWeight: "700", fontSize: 15 },
+  saveButton: {
+    backgroundColor: colors.accent, padding: 16, alignItems: "center",
+    borderRadius: layout.buttonRadius, marginVertical: 24,
+  },
+  saveButtonText: { color: "#000", fontWeight: "800", fontSize: 16 },
 });

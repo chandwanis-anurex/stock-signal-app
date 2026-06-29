@@ -3,12 +3,13 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert 
 import { useFocusEffect } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { api } from "../api/client";
+import { colors, typography, layout } from "../theme";
 
 const CHANNELS = [
-  { type: "sms", label: "WhatsApp", placeholder: "+17325265699" },
-  { type: "email", label: "Email", placeholder: "you@example.com" },
-  { type: "push", label: "Push notification (this device)", placeholder: "auto-filled from device token" },
-  { type: "webhook", label: "Webhook (broker/automation URL)", placeholder: "https://your-broker-relay.example.com/hook" },
+  { type: "sms", label: "WhatsApp", icon: "💬", placeholder: "+17325265699" },
+  { type: "email", label: "Email", icon: "✉️", placeholder: "you@example.com" },
+  { type: "push", label: "Push Notification", icon: "🔔", placeholder: "" },
+  { type: "webhook", label: "Webhook", icon: "🔗", placeholder: "https://your-relay.example.com/hook" },
 ];
 
 export default function AlertChannelsScreen({ route, navigation }) {
@@ -19,9 +20,7 @@ export default function AlertChannelsScreen({ route, navigation }) {
 
   useFocusEffect(useCallback(() => {
     api.listAlertChannels(watchlistId, ruleId).then((channels) => {
-      const dest = {};
-      const en = {};
-      const ids = {};
+      const dest = {}, en = {}, ids = {};
       channels.forEach((c) => {
         dest[c.channel_type] = c.destination;
         en[c.channel_type] = c.active;
@@ -36,10 +35,7 @@ export default function AlertChannelsScreen({ route, navigation }) {
   const registerForPush = async () => {
     try {
       const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Push permission denied");
-        return;
-      }
+      if (status !== "granted") { Alert.alert("Push permission denied"); return; }
       const token = (await Notifications.getExpoPushTokenAsync({
         projectId: "704b6240-b34b-43ee-a76e-2be8ddade1e9",
       })).data;
@@ -51,10 +47,7 @@ export default function AlertChannelsScreen({ route, navigation }) {
   };
 
   const toggle = (type) => {
-    if (type === "push" && !destinations.push) {
-      registerForPush();
-      return;
-    }
+    if (type === "push" && !destinations.push) { registerForPush(); return; }
     setEnabled((e) => ({ ...e, [type]: !e[type] }));
   };
 
@@ -64,7 +57,7 @@ export default function AlertChannelsScreen({ route, navigation }) {
         .filter((c) => enabled[c.type] && destinations[c.type] && !existingIds[c.type])
         .map((c) => api.addAlertChannel(watchlistId, ruleId, c.type, destinations[c.type]));
       await Promise.all(jobs);
-      Alert.alert("Saved", "Alert channels configured for this rule.");
+      Alert.alert("Saved", "Alert channels configured.");
       navigation.popToTop();
     } catch (e) {
       Alert.alert("Save failed", e.message);
@@ -74,14 +67,20 @@ export default function AlertChannelsScreen({ route, navigation }) {
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>{ruleName}</Text>
-      <Text style={styles.subtitle}>Choose where to send buy/sell alerts for this rule.</Text>
+      <Text style={styles.subtitle}>Choose where to receive alerts for this rule.</Text>
 
       {CHANNELS.map((c) => (
-        <View key={c.type} style={styles.channelBlock}>
+        <View key={c.type} style={styles.channelCard}>
           <View style={styles.channelHeader}>
-            <Text style={styles.channelLabel}>{c.label}</Text>
-            <TouchableOpacity onPress={() => toggle(c.type)}>
-              <Text style={enabled[c.type] ? styles.toggleOn : styles.toggleOff}>
+            <View style={styles.channelLeft}>
+              <Text style={styles.channelIcon}>{c.icon}</Text>
+              <Text style={styles.channelLabel}>{c.label}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.toggle, enabled[c.type] ? styles.toggleOn : styles.toggleOff]}
+              onPress={() => toggle(c.type)}
+            >
+              <Text style={[styles.toggleText, enabled[c.type] ? styles.toggleTextOn : styles.toggleTextOff]}>
                 {enabled[c.type] ? "ON" : "OFF"}
               </Text>
             </TouchableOpacity>
@@ -90,13 +89,14 @@ export default function AlertChannelsScreen({ route, navigation }) {
             <TextInput
               style={styles.input}
               placeholder={c.placeholder}
+              placeholderTextColor={colors.textMuted}
               value={destinations[c.type] || ""}
               onChangeText={(v) => setDestinations((d) => ({ ...d, [c.type]: v }))}
               autoCapitalize="none"
             />
           )}
           {c.type === "push" && enabled.push && (
-            <Text style={styles.hint}>Device registered for push alerts.</Text>
+            <Text style={styles.pushHint}>Device registered for push alerts.</Text>
           )}
         </View>
       ))}
@@ -109,16 +109,32 @@ export default function AlertChannelsScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 16 },
-  title: { fontSize: 18, fontWeight: "700" },
-  subtitle: { fontSize: 13, color: "#777", marginBottom: 16 },
-  channelBlock: { marginBottom: 16, borderBottomWidth: 1, borderBottomColor: "#eee", paddingBottom: 12 },
+  container: { flex: 1, backgroundColor: colors.bg, padding: layout.screenPadding },
+  title: { ...typography.heading2, marginBottom: 4 },
+  subtitle: { ...typography.bodySmall, marginBottom: 20 },
+  channelCard: {
+    backgroundColor: colors.card, borderRadius: layout.cardRadius,
+    borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 12,
+  },
   channelHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  channelLabel: { fontSize: 15, fontWeight: "600" },
-  toggleOn: { color: "#1a9e4f", fontWeight: "700" },
-  toggleOff: { color: "#999", fontWeight: "700" },
-  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 8, padding: 10, marginTop: 8 },
-  hint: { fontSize: 12, color: "#999", marginTop: 6 },
-  saveButton: { backgroundColor: "#1a73e8", padding: 16, alignItems: "center", borderRadius: 8, marginVertical: 24 },
-  saveButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  channelLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  channelIcon: { fontSize: 20 },
+  channelLabel: { ...typography.heading3 },
+  toggle: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  toggleOn: { backgroundColor: colors.accentDim, borderColor: colors.accent },
+  toggleOff: { backgroundColor: colors.border, borderColor: colors.border },
+  toggleText: { fontSize: 12, fontWeight: "700" },
+  toggleTextOn: { color: colors.accent },
+  toggleTextOff: { color: colors.textSecondary },
+  input: {
+    backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
+    borderRadius: layout.inputRadius, padding: 12, color: colors.textPrimary,
+    fontSize: 14, marginTop: 12,
+  },
+  pushHint: { ...typography.bodySmall, marginTop: 10 },
+  saveButton: {
+    backgroundColor: colors.accent, padding: 16, alignItems: "center",
+    borderRadius: layout.buttonRadius, marginVertical: 24,
+  },
+  saveButtonText: { color: "#000", fontWeight: "800", fontSize: 16 },
 });

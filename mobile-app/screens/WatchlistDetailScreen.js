@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../api/client";
+import { colors, typography, layout } from "../theme";
 
 export default function WatchlistDetailScreen({ route, navigation }) {
   const { watchlistId, name } = route.params;
@@ -27,58 +28,76 @@ export default function WatchlistDetailScreen({ route, navigation }) {
   }, [load, navigation, name]));
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Rules ({rules.length})</Text>
-      <FlatList
-        data={rules}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => (
+    <ScrollView style={styles.container}>
+      <Text style={styles.sectionLabel}>Rules</Text>
+      {rules.length === 0 ? (
+        <Text style={styles.empty}>No rules yet.</Text>
+      ) : (
+        rules.map((item) => (
           <TouchableOpacity
-            style={styles.row}
+            key={item.id}
+            style={styles.card}
             onPress={() => navigation.navigate("AlertChannels", { watchlistId, ruleId: item.id, ruleName: item.name })}
           >
-            <Text style={styles.rowTitle}>{item.name}</Text>
+            <Text style={styles.cardTitle}>{item.name}</Text>
+            <Text style={styles.cardArrow}>›</Text>
           </TouchableOpacity>
-        )}
-        ListEmptyComponent={<Text style={styles.empty}>No rules yet.</Text>}
-      />
+        ))
+      )}
+
       <TouchableOpacity
-        style={styles.secondaryButton}
+        style={styles.addButton}
         onPress={() => navigation.navigate("RuleBuilder", { watchlistId })}
       >
-        <Text style={styles.secondaryButtonText}>+ New Rule</Text>
+        <Text style={styles.addButtonText}>+ New Rule</Text>
       </TouchableOpacity>
 
-      <Text style={styles.sectionTitle}>Matched symbols ({symbols.length})</Text>
-      <FlatList
-        data={symbols}
-        keyExtractor={(item, i) => `${item.symbol}-${i}`}
-        renderItem={({ item }) => (
-          <View style={styles.symbolRow}>
-            <Text>{item.symbol}</Text>
-            <Text style={styles.rowSub}>{item.exchange}</Text>
-          </View>
-        )}
-        ListEmptyComponent={<Text style={styles.empty}>No symbols yet — the screener runs on a schedule.</Text>}
-      />
-    </View>
+      <Text style={styles.sectionLabel}>Matched Symbols ({symbols.length})</Text>
+      {symbols.length === 0 ? (
+        <Text style={styles.empty}>No symbols yet — screener runs on a schedule.</Text>
+      ) : (
+        <View style={styles.symbolGrid}>
+          {symbols.map((item, i) => (
+            <View key={`${item.symbol}-${i}`} style={styles.symbolChip}>
+              <Text style={styles.symbolText}>{item.symbol}</Text>
+              <Text style={styles.symbolExchange}>{item.exchange}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 12 },
-  sectionTitle: { fontSize: 14, fontWeight: "700", marginTop: 16, marginBottom: 8, color: "#333" },
-  row: { padding: 14, borderBottomWidth: 1, borderBottomColor: "#eee" },
-  rowTitle: { fontSize: 15, fontWeight: "600" },
-  rowSub: { fontSize: 12, color: "#888" },
-  symbolRow: {
+  container: { flex: 1, backgroundColor: colors.bg, padding: layout.screenPadding },
+  sectionLabel: { ...typography.label, marginTop: 20, marginBottom: 10 },
+  empty: { ...typography.bodySmall, marginBottom: 12 },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: layout.cardRadius,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: 10,
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f3f3",
+    alignItems: "center",
   },
-  empty: { color: "#999", paddingVertical: 8 },
-  secondaryButton: { padding: 10, alignItems: "center" },
-  secondaryButtonText: { color: "#1a73e8", fontWeight: "600" },
+  cardTitle: { ...typography.heading3 },
+  cardArrow: { fontSize: 22, color: colors.textSecondary },
+  addButton: { padding: 12, alignItems: "center", marginBottom: 8 },
+  addButtonText: { color: colors.accent, fontWeight: "700", fontSize: 15 },
+  symbolGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 24 },
+  symbolChip: {
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignItems: "center",
+  },
+  symbolText: { ...typography.body, fontWeight: "700" },
+  symbolExchange: { fontSize: 10, color: colors.textMuted, marginTop: 2 },
 });

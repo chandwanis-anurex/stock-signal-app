@@ -30,6 +30,28 @@ def _macd(series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9):
     return macd_line, signal_line
 
 
+def _williams_r(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    high = df["high"].rolling(period).max()
+    low = df["low"].rolling(period).min()
+    return -100 * (high - df["close"]) / (high - low)
+
+
+def _ultimate_oscillator(df: pd.DataFrame) -> pd.Series:
+    prev_close = df["close"].shift(1)
+    bp = df["close"] - df[["low", prev_close]].min(axis=1)
+    tr = df[["high", prev_close]].max(axis=1) - df[["low", prev_close]].min(axis=1)
+    avg7 = bp.rolling(7).sum() / tr.rolling(7).sum()
+    avg14 = bp.rolling(14).sum() / tr.rolling(14).sum()
+    avg28 = bp.rolling(28).sum() / tr.rolling(28).sum()
+    return 100 * (4 * avg7 + 2 * avg14 + avg28) / 7
+
+
+def _bollinger(series: pd.Series, period: int = 20):
+    mid = series.rolling(period).mean()
+    std = series.rolling(period).std()
+    return mid + 2 * std, mid - 2 * std
+
+
 def _compute_indicator(df: pd.DataFrame, term: IndicatorTerm) -> pd.Series:
     name = term.indicator.upper()
     params = term.params or {}
@@ -52,6 +74,16 @@ def _compute_indicator(df: pd.DataFrame, term: IndicatorTerm) -> pd.Series:
         return df["volume"].rolling(params.get("period", 20)).mean()
     elif name == "CLOSE":
         return df["close"]
+    elif name == "WILLIAMS_R":
+        return _williams_r(df, period=params.get("period", 14))
+    elif name == "ULTIMATE_OSC":
+        return _ultimate_oscillator(df)
+    elif name == "BB_UPPER":
+        upper, _ = _bollinger(df["close"], period=params.get("period", 20))
+        return upper
+    elif name == "BB_LOWER":
+        _, lower = _bollinger(df["close"], period=params.get("period", 20))
+        return lower
     else:
         raise ValueError(f"Unsupported indicator: {term.indicator}")
 
