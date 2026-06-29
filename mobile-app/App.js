@@ -16,6 +16,7 @@ import AlertChannelsScreen from "./screens/AlertChannelsScreen";
 import RuleDetailScreen from "./screens/RuleDetailScreen";
 import SignalFeedScreen from "./screens/SignalFeedScreen";
 import AnalyticsScreen from "./screens/AnalyticsScreen";
+import HelpScreen from "./screens/HelpScreen";
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -56,7 +57,7 @@ function WatchlistsStack() {
   );
 }
 
-function AccountScreen({ onLogout }) {
+function AccountScreen({ onLogout, navigation }) {
   const logout = async () => {
     await auth.removeToken();
     onLogout();
@@ -69,10 +70,25 @@ function AccountScreen({ onLogout }) {
         <Text style={styles.accountTitle}>SignalFlow</Text>
         <Text style={styles.accountSubtitle}>Algorithmic stock alerts, simplified</Text>
       </View>
+      <TouchableOpacity onPress={() => navigation.navigate("Help")} style={styles.helpButton}>
+        <Text style={styles.helpButtonText}>Help & About</Text>
+      </TouchableOpacity>
       <TouchableOpacity onPress={logout} style={styles.signOutButton}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
     </View>
+  );
+}
+
+const AccountStack = createNativeStackNavigator();
+function AccountStackScreen({ onLogout }) {
+  return (
+    <AccountStack.Navigator screenOptions={stackScreenOptions}>
+      <AccountStack.Screen name="AccountMain" options={{ title: "Account" }}>
+        {(props) => <AccountScreen {...props} onLogout={onLogout} />}
+      </AccountStack.Screen>
+      <AccountStack.Screen name="Help" component={HelpScreen} options={{ title: "Help & About" }} />
+    </AccountStack.Navigator>
   );
 }
 
@@ -96,8 +112,8 @@ function MainApp({ onLogout }) {
       />
       <Tabs.Screen name="Signals" component={SignalFeedScreen} options={{ title: "Signals" }} />
       <Tabs.Screen name="Analytics" component={AnalyticsScreen} options={{ title: "Analytics" }} />
-      <Tabs.Screen name="Account" options={{ title: "Account" }}>
-        {() => <AccountScreen onLogout={onLogout} />}
+      <Tabs.Screen name="Account" options={{ title: "Account", headerShown: false }}>
+        {() => <AccountStackScreen onLogout={onLogout} />}
       </Tabs.Screen>
     </Tabs.Navigator>
   );
@@ -142,6 +158,11 @@ const styles = StyleSheet.create({
   },
   accountTitle: { fontSize: 22, fontWeight: "800", color: colors.textPrimary },
   accountSubtitle: { fontSize: 14, color: colors.textSecondary },
+  helpButton: {
+    borderWidth: 1, borderColor: colors.border,
+    padding: 16, borderRadius: 10, alignItems: "center", marginBottom: 12,
+  },
+  helpButtonText: { color: colors.textPrimary, fontWeight: "700", fontSize: 16 },
   signOutButton: {
     backgroundColor: colors.danger + "22", borderWidth: 1, borderColor: colors.danger,
     padding: 16, borderRadius: 10, alignItems: "center",

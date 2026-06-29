@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const pkg = require\\('./node_modules/expo-constants/package.json'\\); console.log\\(pkg.version\\)\")"
+    ]
+  }
+}
