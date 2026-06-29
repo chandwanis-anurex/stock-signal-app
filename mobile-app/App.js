@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { auth } from "./api/client";
+import { Ionicons } from "@expo/vector-icons";
 import { colors } from "./theme";
 import Logo from "./components/Logo";
 import AuthScreen from "./screens/AuthScreen";
@@ -108,11 +109,23 @@ function MainApp({ onLogout }) {
       <Tabs.Screen
         name="WatchlistsTab"
         component={WatchlistsStack}
-        options={{ title: "Watchlists", headerShown: false, tabBarLabel: "Watchlists" }}
+        options={{
+          title: "Watchlists", headerShown: false, tabBarLabel: "Watchlists",
+          tabBarIcon: ({ color, size }) => <Ionicons name="list" size={size} color={color} />,
+        }}
       />
-      <Tabs.Screen name="Signals" component={SignalFeedScreen} options={{ title: "Signals" }} />
-      <Tabs.Screen name="Analytics" component={AnalyticsScreen} options={{ title: "Analytics" }} />
-      <Tabs.Screen name="Account" options={{ title: "Account", headerShown: false }}>
+      <Tabs.Screen name="Signals" component={SignalFeedScreen} options={{
+        title: "Signals",
+        tabBarIcon: ({ color, size }) => <Ionicons name="flash" size={size} color={color} />,
+      }} />
+      <Tabs.Screen name="Analytics" component={AnalyticsScreen} options={{
+        title: "Analytics",
+        tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" size={size} color={color} />,
+      }} />
+      <Tabs.Screen name="Account" options={{
+        title: "Account", headerShown: false,
+        tabBarIcon: ({ color, size }) => <Ionicons name="person-circle" size={size} color={color} />,
+      }}>
         {() => <AccountStackScreen onLogout={onLogout} />}
       </Tabs.Screen>
     </Tabs.Navigator>
