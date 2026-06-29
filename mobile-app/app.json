@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Stock Signal App",
+    "slug": "stock-signal-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yourcompany.stocksignalapp",
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
+    },
+    "plugins": ["expo-notifications"]
+  }
+}
