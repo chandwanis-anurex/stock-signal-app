@@ -12,13 +12,15 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.yourcompany.stocksignalapp",
+      "bundleIdentifier": "com.signalflow.app",
+      "buildNumber": "1",
       "infoPlist": {
         "UIBackgroundModes": [
-          "remote-notification",
           "remote-notification"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Not used",
+        "NSMicrophoneUsageDescription": "Not used"
       }
     },
     "plugins": [
