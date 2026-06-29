@@ -28,6 +28,21 @@ def list_rules(watchlist_id: int, db: Session = Depends(get_db)):
     return [{"id": r.id, "name": r.name, "active": r.active} for r in rules]
 
 
+@router.get("/{rule_id}")
+def get_rule(watchlist_id: int, rule_id: int, db: Session = Depends(get_db)):
+    rule = db.query(Rule).filter(Rule.id == rule_id, Rule.watchlist_id == watchlist_id).first()
+    if not rule:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Rule not found")
+    return {
+        "id": rule.id,
+        "name": rule.name,
+        "active": rule.active,
+        "buy_condition": rule.buy_condition,
+        "sell_condition": rule.sell_condition,
+    }
+
+
 @router.get("/{rule_id}/alert-channels")
 def list_alert_channels(watchlist_id: int, rule_id: int, db: Session = Depends(get_db)):
     channels = db.query(AlertChannel).filter(AlertChannel.rule_id == rule_id).all()

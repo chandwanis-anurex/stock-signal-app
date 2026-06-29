@@ -12,6 +12,7 @@ import CriteriaBuilderScreen from "./screens/CriteriaBuilderScreen";
 import WatchlistDetailScreen from "./screens/WatchlistDetailScreen";
 import RuleBuilderScreen from "./screens/RuleBuilderScreen";
 import AlertChannelsScreen from "./screens/AlertChannelsScreen";
+import RuleDetailScreen from "./screens/RuleDetailScreen";
 import SignalFeedScreen from "./screens/SignalFeedScreen";
 import AnalyticsScreen from "./screens/AnalyticsScreen";
 
@@ -43,6 +44,7 @@ function WatchlistsStack() {
       <Stack.Screen name="CriteriaBuilder" component={CriteriaBuilderScreen} options={{ title: "New Watchlist" }} />
       <Stack.Screen name="WatchlistDetail" component={WatchlistDetailScreen} options={{ title: "Watchlist" }} />
       <Stack.Screen name="RuleBuilder" component={RuleBuilderScreen} options={{ title: "New Rule" }} />
+      <Stack.Screen name="RuleDetail" component={RuleDetailScreen} options={{ title: "Rule" }} />
       <Stack.Screen name="AlertChannels" component={AlertChannelsScreen} options={{ title: "Alert Channels" }} />
     </Stack.Navigator>
   );

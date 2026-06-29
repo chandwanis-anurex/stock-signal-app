@@ -37,7 +37,7 @@ export default function WatchlistDetailScreen({ route, navigation }) {
           <TouchableOpacity
             key={item.id}
             style={styles.card}
-            onPress={() => navigation.navigate("AlertChannels", { watchlistId, ruleId: item.id, ruleName: item.name })}
+            onPress={() => navigation.navigate("RuleDetail", { watchlistId, ruleId: item.id })}
           >
             <Text style={styles.cardTitle}>{item.name}</Text>
             <Text style={styles.cardArrow}>›</Text>
