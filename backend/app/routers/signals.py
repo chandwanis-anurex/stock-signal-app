@@ -78,5 +78,5 @@ def delete_signal(signal_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/rules/{rule_id}/performance")
-def rule_performance(rule_id: int, db: Session = Depends(get_db)):
-    return rule_performance_summary(db, rule_id)
+def rule_performance(rule_id: int, period: str = "all", db: Session = Depends(get_db)):
+    return rule_performance_summary(db, rule_id, period)

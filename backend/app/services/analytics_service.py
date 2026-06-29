@@ -1,7 +1,3 @@
-"""
-Computes performance checkpoints for fired signals so the app can show
-"how would this rule have actually done" without needing real trades.
-"""
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
@@ -12,6 +8,13 @@ CHECKPOINTS = {
     "1d": timedelta(days=1),
     "1w": timedelta(days=7),
     "1m": timedelta(days=30),
+}
+
+PERIOD_CONFIG = {
+    "daily":   {"window": timedelta(days=1),  "checkpoint": "1d"},
+    "weekly":  {"window": timedelta(days=7),  "checkpoint": "1w"},
+    "monthly": {"window": timedelta(days=30), "checkpoint": "1m"},
+    "all":     {"window": None,               "checkpoint": "current"},
 }
 
 
@@ -32,8 +35,6 @@ def record_checkpoint(db: Session, signal: Signal, checkpoint: str, current_pric
 
 
 def update_due_checkpoints(db: Session):
-    """Run periodically: for every signal, check whether any checkpoint window
-    has elapsed and hasn't been recorded yet, fetch the current price, and log it."""
     provider = get_provider()
     signals = db.query(Signal).all()
 
@@ -49,7 +50,6 @@ def update_due_checkpoints(db: Session):
                 except Exception:
                     continue
 
-        # always refresh "current" so open signals show live running performance
         try:
             price = provider.get_latest_price(signal.symbol)
             record_checkpoint(db, signal, "current", price)
@@ -57,23 +57,39 @@ def update_due_checkpoints(db: Session):
             continue
 
 
-def rule_performance_summary(db: Session, rule_id: int) -> dict:
-    signals = db.query(Signal).filter(Signal.rule_id == rule_id).all()
-    if not signals:
-        return {"win_rate": None, "avg_return_pct": None, "total_signals": 0}
+def rule_performance_summary(db: Session, rule_id: int, period: str = "all") -> dict:
+    config = PERIOD_CONFIG.get(period, PERIOD_CONFIG["all"])
+    q = db.query(Signal).filter(Signal.rule_id == rule_id)
+    if config["window"]:
+        since = datetime.utcnow() - config["window"]
+        q = q.filter(Signal.fired_at >= since)
+    signals = q.all()
 
-    latest_returns = []
-    for s in signals:
-        current = next((p for p in s.performance if p.checkpoint == "current"), None)
-        if current:
-            latest_returns.append(current.return_pct)
-
-    if not latest_returns:
-        return {"win_rate": None, "avg_return_pct": None, "total_signals": len(signals)}
-
-    wins = sum(1 for r in latest_returns if r > 0)
-    return {
-        "win_rate": wins / len(latest_returns),
-        "avg_return_pct": sum(latest_returns) / len(latest_returns),
+    buy_count = sum(1 for s in signals if s.side == "buy")
+    base = {
         "total_signals": len(signals),
+        "buy_signals": buy_count,
+        "sell_signals": len(signals) - buy_count,
+    }
+
+    if not signals:
+        return {**base, "win_rate": None, "avg_return_pct": None, "best_return": None, "worst_return": None}
+
+    checkpoint_key = config["checkpoint"]
+    returns = []
+    for s in signals:
+        chk = next((p for p in s.performance if p.checkpoint == checkpoint_key), None)
+        if chk:
+            returns.append(chk.return_pct)
+
+    if not returns:
+        return {**base, "win_rate": None, "avg_return_pct": None, "best_return": None, "worst_return": None}
+
+    wins = sum(1 for r in returns if r > 0)
+    return {
+        **base,
+        "win_rate": wins / len(returns),
+        "avg_return_pct": sum(returns) / len(returns),
+        "best_return": max(returns),
+        "worst_return": min(returns),
     }

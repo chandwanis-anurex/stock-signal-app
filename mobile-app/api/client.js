@@ -93,5 +93,5 @@ export const api = {
 
   listAllRules: () => request("/signals/rules"),
 
-  getRulePerformance: (ruleId) => request(`/signals/rules/${ruleId}/performance`),
+  getRulePerformance: (ruleId, period = "all") => request(`/signals/rules/${ruleId}/performance?period=${period}`),
 };
