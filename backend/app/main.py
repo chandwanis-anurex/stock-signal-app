@@ -10,9 +10,18 @@ from app.routers.auth import router as auth_router
 from app.services.scheduler import start_scheduler
 
 
+def _run_migrations():
+    with engine.connect() as conn:
+        conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE watchlist_symbols ADD COLUMN IF NOT EXISTS company_name VARCHAR DEFAULT ''"
+        ))
+        conn.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _run_migrations()
     scheduler = start_scheduler()
     yield
     scheduler.shutdown()

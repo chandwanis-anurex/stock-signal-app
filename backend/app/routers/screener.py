@@ -39,6 +39,7 @@ def create_watchlist(payload: WatchlistCreate, db: Session = Depends(get_db), cu
                 watchlist_id=wl.id,
                 symbol=row.get("name"),
                 exchange=row.get("exchange", ""),
+                company_name=row.get("description", ""),
             ))
         wl.last_run_at = datetime.utcnow()
         db.commit()

@@ -3,7 +3,6 @@ import { View, Text, FlatList, StyleSheet, RefreshControl } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../api/client";
 import { colors, typography, layout } from "../theme";
-import { getCompanyName } from "../data/companyNames";
 
 export default function SignalFeedScreen() {
   const [signals, setSignals] = useState([]);
@@ -35,7 +34,7 @@ export default function SignalFeedScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         renderItem={({ item }) => {
           const isBuy = item.side === "buy";
-          const companyName = getCompanyName(item.symbol);
+          const companyName = item.company_name || "";
           return (
             <View style={styles.card}>
               <View style={[styles.badge, isBuy ? styles.buyBadge : styles.sellBadge]}>

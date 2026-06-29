@@ -41,7 +41,7 @@ def run_screener(criteria: ScreenerCriteria) -> List[Dict]:
 
     query = (
         Query()
-        .select("name", "close", "volume", "market_cap_basic", "sector", "exchange")
+        .select("name", "description", "close", "volume", "market_cap_basic", "sector", "exchange")
         .where(Column("exchange").isin(criteria.exchanges))
         .limit(criteria.limit)
     )

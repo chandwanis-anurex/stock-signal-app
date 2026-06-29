@@ -43,6 +43,7 @@ class WatchlistSymbol(Base):
     watchlist_id = Column(Integer, ForeignKey("watchlists.id"))
     symbol = Column(String, nullable=False)
     exchange = Column(String, nullable=False)
+    company_name = Column(String, nullable=False, default="")
     added_at = Column(DateTime, default=datetime.utcnow)
 
     watchlist = relationship("Watchlist", back_populates="symbols")
