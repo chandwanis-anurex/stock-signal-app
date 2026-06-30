@@ -91,10 +91,7 @@ def get_provider() -> MarketDataProvider:
     provider = os.getenv("MARKET_DATA_PROVIDER", "polygon")
     api_key = os.getenv("MARKET_DATA_API_KEY", "")
 
-    if provider == "polygon":
-        return PolygonProvider(api_key)
-    elif provider == "alpaca":
+    if provider == "alpaca":
         secret = os.getenv("MARKET_DATA_SECRET_KEY", "")
         return AlpacaProvider(api_key, secret)
-    else:
-        raise ValueError(f"Unsupported MARKET_DATA_PROVIDER: {provider}")
+    return PolygonProvider(api_key)
