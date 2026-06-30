@@ -36,6 +36,12 @@ export const api = {
   resetPassword: (email, code, newPassword) =>
     request("/auth/reset-password", { method: "POST", body: JSON.stringify({ email, code, new_password: newPassword }) }),
 
+  updateWatchlist: (id, name) =>
+    request(`/screener/watchlists/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+
+  deleteWatchlistSymbol: (watchlistId, symbol) =>
+    request(`/screener/watchlists/${watchlistId}/symbols/${symbol}`, { method: "DELETE" }),
+
   runScreenerPreview: (criteria) =>
     request("/screener/run", { method: "POST", body: JSON.stringify(criteria) }),
 

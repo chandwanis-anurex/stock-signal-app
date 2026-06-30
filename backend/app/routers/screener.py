@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -85,9 +85,32 @@ def delete_watchlist(watchlist_id: int, db: Session = Depends(get_db)):
     return {"deleted": watchlist_id}
 
 
+@router.patch("/watchlists/{watchlist_id}")
+def update_watchlist(watchlist_id: int, payload: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    wl = db.query(Watchlist).filter(Watchlist.id == watchlist_id, Watchlist.user_id == current_user.id).first()
+    if not wl:
+        raise HTTPException(status_code=404, detail="Watchlist not found")
+    if "name" in payload:
+        wl.name = payload["name"]
+    db.commit()
+    return {"id": wl.id, "name": wl.name}
+
+
 @router.get("/watchlists/{watchlist_id}/symbols")
 def get_watchlist_symbols(watchlist_id: int, db: Session = Depends(get_db)):
     wl = db.query(Watchlist).filter(Watchlist.id == watchlist_id).first()
     if not wl:
         return {"error": "not found"}
-    return [{"symbol": s.symbol, "exchange": s.exchange} for s in wl.symbols]
+    return [{"symbol": s.symbol, "exchange": s.exchange, "company_name": getattr(s, "company_name", "")} for s in wl.symbols]
+
+
+@router.delete("/watchlists/{watchlist_id}/symbols/{symbol}")
+def delete_watchlist_symbol(watchlist_id: int, symbol: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    wl = db.query(Watchlist).filter(Watchlist.id == watchlist_id, Watchlist.user_id == current_user.id).first()
+    if not wl:
+        raise HTTPException(status_code=404, detail="Watchlist not found")
+    sym = db.query(WatchlistSymbol).filter(WatchlistSymbol.watchlist_id == watchlist_id, WatchlistSymbol.symbol == symbol.upper()).first()
+    if sym:
+        db.delete(sym)
+        db.commit()
+    return {"deleted": symbol}
