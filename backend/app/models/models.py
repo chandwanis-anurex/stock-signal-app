@@ -16,6 +16,8 @@ class User(Base):
     phone = Column(String, nullable=True)
     push_token = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    reset_code = Column(String, nullable=True)
+    reset_code_expiry = Column(Float, nullable=True)
 
     watchlists = relationship("Watchlist", back_populates="user")
 

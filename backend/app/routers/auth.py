@@ -15,9 +15,6 @@ from app.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# In-memory store: email -> (code, expiry_timestamp)
-_reset_codes: dict = {}
-
 
 class RegisterRequest(BaseModel):
     email: str
@@ -59,7 +56,9 @@ def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Sessio
     if not user:
         raise HTTPException(status_code=404, detail="No account with that email")
     code = str(random.randint(100000, 999999))
-    _reset_codes[payload.email] = (code, time.time() + 600)  # 10 min expiry
+    user.reset_code = code
+    user.reset_code_expiry = time.time() + 600  # 10 min
+    db.commit()
     sg = sendgrid.SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY", ""))
     mail = Mail(
         from_email=os.getenv("ALERT_FROM_EMAIL", "noreply@signalflow.app"),
@@ -73,21 +72,20 @@ def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Sessio
 
 @router.post("/reset-password")
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
-    entry = _reset_codes.get(payload.email)
-    if not entry:
-        raise HTTPException(status_code=400, detail="No reset code requested for this email")
-    code, expiry = entry
-    if time.time() > expiry:
-        del _reset_codes[payload.email]
-        raise HTTPException(status_code=400, detail="Reset code has expired — request a new one")
-    if payload.code != code:
-        raise HTTPException(status_code=400, detail="Incorrect reset code")
     user = db.query(User).filter(User.email == payload.email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    if not user or not user.reset_code:
+        raise HTTPException(status_code=400, detail="No reset code requested for this email")
+    if time.time() > (user.reset_code_expiry or 0):
+        user.reset_code = None
+        user.reset_code_expiry = None
+        db.commit()
+        raise HTTPException(status_code=400, detail="Reset code has expired — request a new one")
+    if payload.code != user.reset_code:
+        raise HTTPException(status_code=400, detail="Incorrect reset code")
     user.hashed_password = hash_password(payload.new_password)
+    user.reset_code = None
+    user.reset_code_expiry = None
     db.commit()
-    del _reset_codes[payload.email]
     return {"ok": True}
 
 

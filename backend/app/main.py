@@ -20,6 +20,12 @@ def _run_migrations():
         conn.execute(__import__("sqlalchemy").text(
             "ALTER TABLE watchlist_symbols ADD COLUMN IF NOT EXISTS company_name VARCHAR DEFAULT ''"
         ))
+        conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code VARCHAR"
+        ))
+        conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code_expiry FLOAT"
+        ))
         conn.commit()
 
 
