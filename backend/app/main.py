@@ -39,8 +39,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://signalflow.app",
+        "https://web-rho-sable-37.vercel.app",
+        "https://web-mca1p4zlf-chandwanis-3660s-projects.vercel.app",
     ],
-    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
