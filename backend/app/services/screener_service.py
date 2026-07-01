@@ -43,7 +43,6 @@ def run_screener(criteria: ScreenerCriteria) -> List[Dict]:
         Query()
         .select("name", "description", "close", "volume", "market_cap_basic", "sector", "exchange")
         .where(Column("exchange").isin(criteria.exchanges))
-        .limit(criteria.limit)
     )
 
     conditions = []
@@ -58,6 +57,9 @@ def run_screener(criteria: ScreenerCriteria) -> List[Dict]:
         else:
             query = query.where2(Or(*conditions))   # OR requires where2() + Or() combinator
 
-    _, df = query.get_scanner_data()
+    # TradingView's API errors out if the requested range exceeds the number
+    # of matching rows, so probe the real total first and clamp to it.
+    total_count, _ = query.limit(1).get_scanner_data()
+    _, df = query.limit(min(criteria.limit, total_count)).get_scanner_data()
 
     return df.to_dict(orient="records")
