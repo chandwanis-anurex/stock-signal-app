@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from "@expo-google-fonts/inter";
-import { NavigationContainer, DarkTheme } from "@react-navigation/native";
+import { NavigationContainer, DarkTheme, useNavigation } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
@@ -38,7 +38,16 @@ const navTheme = {
   },
 };
 
-const headerLogo = () => <Logo size={36} style={{ marginRight: 12 }} />;
+function HeaderLogo() {
+  const navigation = useNavigation();
+  return (
+    <TouchableOpacity onPress={() => navigation.navigate("HowItWorks")} style={{ marginRight: 12 }}>
+      <Logo size={36} />
+    </TouchableOpacity>
+  );
+}
+
+const headerLogo = () => <HeaderLogo />;
 
 const stackScreenOptions = {
   headerStyle: { backgroundColor: colors.card },
@@ -59,6 +68,9 @@ function WatchlistsStack() {
       <Stack.Screen name="RuleDetail" component={RuleDetailScreen} options={{ title: "Rule" }} />
       <Stack.Screen name="AlertChannels" component={AlertChannelsScreen} options={{ title: "Alert Channels" }} />
       <Stack.Screen name="ManualWatchlist" component={ManualWatchlistScreen} options={{ title: "Enter Symbols" }} />
+      <Stack.Screen name="HowItWorks" options={{ title: "How It Works" }}>
+        {() => <OnboardingScreen onDone={() => {}} />}
+      </Stack.Screen>
     </Stack.Navigator>
   );
 }
