@@ -56,10 +56,18 @@ const EXCHANGES = [
   { value: "NASDAQ,NYSE", label: "NASDAQ + NYSE" },
 ];
 
-export default function CriteriaBuilderScreen({ navigation }) {
-  const [name, setName] = useState("");
-  const [exchanges, setExchanges] = useState("NASDAQ,NYSE,AMEX");
-  const [filters, setFilters] = useState([{ field: "market_cap_basic", operator: "gt", value: "1000000000" }]);
+export default function CriteriaBuilderScreen({ navigation, route }) {
+  const { watchlistId, existingName, existingCriteria } = route.params || {};
+  const isEditing = !!watchlistId;
+
+  const [name, setName] = useState(existingName || "");
+  const [exchanges, setExchanges] = useState(
+    existingCriteria?.exchanges?.join(",") || "NASDAQ,NYSE,AMEX"
+  );
+  const [filters, setFilters] = useState(
+    existingCriteria?.filters?.map(f => ({ ...f, value: String(f.value) })) ||
+    [{ field: "market_cap_basic", operator: "gt", value: "1000000000" }]
+  );
   const [previewCount, setPreviewCount] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -95,8 +103,13 @@ export default function CriteriaBuilderScreen({ navigation }) {
   const save = async () => {
     if (!name.trim()) { Alert.alert("Name required"); return; }
     try {
-      const wl = await api.createWatchlist(name, buildCriteria());
-      navigation.replace("WatchlistDetail", { watchlistId: wl.id, name: wl.name });
+      if (isEditing) {
+        await api.updateWatchlist(watchlistId, { name: name.trim(), criteria: buildCriteria() });
+        navigation.navigate("WatchlistDetail", { watchlistId, name: name.trim(), criteria: buildCriteria() });
+      } else {
+        const wl = await api.createWatchlist(name, buildCriteria());
+        navigation.replace("WatchlistDetail", { watchlistId: wl.id, name: wl.name, criteria: buildCriteria() });
+      }
     } catch (e) {
       Alert.alert("Save failed", e.message);
     }
@@ -156,7 +169,7 @@ export default function CriteriaBuilderScreen({ navigation }) {
       )}
 
       <TouchableOpacity style={styles.saveButton} onPress={save}>
-        <Text style={styles.saveButtonText}>Save Watchlist</Text>
+        <Text style={styles.saveButtonText}>{isEditing ? "Update Criteria" : "Save Watchlist"}</Text>
       </TouchableOpacity>
     </ScrollView>
   );

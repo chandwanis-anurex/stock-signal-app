@@ -59,7 +59,7 @@ export default function WatchlistsScreen({ navigation }) {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.card}
-            onPress={() => navigation.navigate("WatchlistDetail", { watchlistId: item.id, name: item.name })}
+            onPress={() => navigation.navigate("WatchlistDetail", { watchlistId: item.id, name: item.name, criteria: item.screener_criteria })}
             onLongPress={() => confirmDelete(item)}
           >
             <View style={styles.cardTop}>

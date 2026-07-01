@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet,
   ScrollView, TextInput, Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,8 +8,29 @@ import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../api/client";
 import { colors, typography, layout } from "../theme";
 
+const FIELD_LABELS = {
+  market_cap_basic: "Market Cap", close: "Price", volume: "Volume",
+  relative_volume_10d_calc: "Rel. Volume 10D", average_volume_10d_calc: "Avg Volume 10D",
+  change: "Change %", change_from_open: "Change from Open %",
+  RSI: "RSI", SMA20: "SMA 20", SMA50: "SMA 50", SMA200: "SMA 200",
+  EMA20: "EMA 20", EMA50: "EMA 50", EMA200: "EMA 200",
+  "MACD.macd": "MACD", "MACD.signal": "MACD Signal",
+  "W.R": "Williams %R", UO: "Ultimate Oscillator",
+  pe_ratio: "P/E Ratio", eps_diluted_ttm: "EPS (TTM)",
+  dividend_yield_recent: "Dividend Yield", debt_to_equity: "Debt/Equity",
+  "High.52W": "52W High", "Low.52W": "52W Low",
+};
+
+const OP_LABELS = { gt: ">", gte: "≥", lt: "<", lte: "≤", eq: "=", neq: "≠" };
+
+function formatValue(v) {
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  return String(v);
+}
+
 export default function WatchlistDetailScreen({ route, navigation }) {
-  const { watchlistId, name: initialName } = route.params;
+  const { watchlistId, name: initialName, criteria: initialCriteria } = route.params;
   const [symbols, setSymbols] = useState([]);
   const [rules, setRules] = useState([]);
   const [editing, setEditing] = useState(false);
@@ -47,7 +68,7 @@ export default function WatchlistDetailScreen({ route, navigation }) {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      await api.updateWatchlist(watchlistId, name.trim());
+      await api.updateWatchlist(watchlistId, { name: name.trim() });
       navigation.setOptions({ title: name.trim() });
     } catch (e) {
       Alert.alert("Save failed", e.message);
@@ -57,29 +78,29 @@ export default function WatchlistDetailScreen({ route, navigation }) {
   };
 
   const deleteSymbol = (symbol) => {
-    Alert.alert(
-      "Remove Symbol",
-      `Remove ${symbol} from this watchlist?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove", style: "destructive",
-          onPress: async () => {
-            try {
-              await api.deleteWatchlistSymbol(watchlistId, symbol);
-              setSymbols(prev => prev.filter(s => s.symbol !== symbol));
-            } catch (e) {
-              Alert.alert("Failed", e.message);
-            }
-          },
+    Alert.alert("Remove Symbol", `Remove ${symbol} from this watchlist?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove", style: "destructive",
+        onPress: async () => {
+          try {
+            await api.deleteWatchlistSymbol(watchlistId, symbol);
+            setSymbols(prev => prev.filter(s => s.symbol !== symbol));
+          } catch (e) {
+            Alert.alert("Failed", e.message);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
+
+  const filters = initialCriteria?.filters || [];
+  const exchanges = initialCriteria?.exchanges || [];
 
   return (
     <ScrollView style={styles.container}>
-      {/* Name editor */}
+
+      {/* Name editor (edit mode only) */}
       {editing && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Watchlist Name</Text>
@@ -99,6 +120,40 @@ export default function WatchlistDetailScreen({ route, navigation }) {
         </View>
       )}
 
+      {/* Screener Criteria */}
+      {initialCriteria && (
+        <>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionLabel}>Screener Criteria</Text>
+            {editing && (
+              <TouchableOpacity onPress={() => navigation.navigate("CriteriaBuilder", {
+                watchlistId,
+                existingName: name,
+                existingCriteria: initialCriteria,
+              })}>
+                <Text style={styles.editLink}>Edit Criteria</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.criteriaCard}>
+            {exchanges.length > 0 && (
+              <Text style={styles.criteriaExchange}>
+                Exchanges: {exchanges.join(", ")}
+              </Text>
+            )}
+            {filters.map((f, i) => (
+              <View key={i} style={styles.criteriaRow}>
+                <Text style={styles.criteriaField}>
+                  {FIELD_LABELS[f.field] || f.field}
+                </Text>
+                <Text style={styles.criteriaOp}>{OP_LABELS[f.operator] || f.operator}</Text>
+                <Text style={styles.criteriaValue}>{formatValue(f.value)}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
       {/* Rules */}
       <Text style={styles.sectionLabel}>Rules</Text>
       {rules.length === 0 ? (
@@ -115,7 +170,6 @@ export default function WatchlistDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         ))
       )}
-
       <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate("RuleBuilder", { watchlistId })}>
         <Text style={styles.addButtonText}>+ New Rule</Text>
       </TouchableOpacity>
@@ -126,8 +180,7 @@ export default function WatchlistDetailScreen({ route, navigation }) {
       </Text>
       {symbols.length === 0 ? (
         <Text style={styles.empty}>No symbols yet — screener runs on a schedule.</Text>
-      ) : editing ? (
-        /* Edit mode: list with delete buttons */
+      ) : (
         <View style={styles.symbolList}>
           {symbols.map((item) => (
             <View key={item.symbol} style={styles.symbolRow}>
@@ -137,22 +190,10 @@ export default function WatchlistDetailScreen({ route, navigation }) {
                   <Text style={styles.symbolCompany}>{item.company_name}</Text>
                 ) : null}
               </View>
-              <TouchableOpacity onPress={() => deleteSymbol(item.symbol)} style={styles.deleteBtn}>
-                <Ionicons name="close-circle" size={22} color={colors.sell} />
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
-      ) : (
-        /* Normal mode: chip grid */
-        <View style={styles.symbolGrid}>
-          {symbols.map((item, i) => (
-            <View key={`${item.symbol}-${i}`} style={styles.symbolChip}>
-              <Text style={styles.symbolChipText}>{item.symbol}</Text>
-              {item.company_name ? (
-                <Text style={styles.symbolExchange}>{item.company_name}</Text>
-              ) : (
-                <Text style={styles.symbolExchange}>{item.exchange}</Text>
+              {editing && (
+                <TouchableOpacity onPress={() => deleteSymbol(item.symbol)} style={styles.deleteBtn}>
+                  <Ionicons name="close-circle" size={22} color={colors.sell} />
+                </TouchableOpacity>
               )}
             </View>
           ))}
@@ -168,74 +209,46 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: layout.screenPadding },
   section: { marginBottom: 8 },
   sectionLabel: { ...typography.label, marginTop: 20, marginBottom: 10 },
+  sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 20, marginBottom: 10 },
+  editLink: { color: colors.accent, fontFamily: "Inter_600SemiBold", fontSize: 13 },
   empty: { ...typography.bodySmall, marginBottom: 12 },
 
   nameRow: { flexDirection: "row", gap: 10, alignItems: "center" },
   nameInput: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: layout.inputRadius,
-    padding: 12,
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
+    flex: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+    borderRadius: layout.inputRadius, padding: 12, color: colors.textPrimary,
+    fontSize: 15, fontFamily: "Inter_600SemiBold",
   },
-  saveBtn: {
-    backgroundColor: colors.accent,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: layout.buttonRadius,
-  },
+  saveBtn: { backgroundColor: colors.accent, paddingHorizontal: 18, paddingVertical: 12, borderRadius: layout.buttonRadius },
   saveBtnText: { color: "#000", fontFamily: "Inter_700Bold", fontSize: 14 },
 
+  criteriaCard: {
+    backgroundColor: colors.card, borderRadius: layout.cardRadius,
+    borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 8,
+  },
+  criteriaExchange: { fontSize: 12, color: colors.textSecondary, marginBottom: 10, fontFamily: "Inter_600SemiBold" },
+  criteriaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  criteriaField: { flex: 1, fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.textPrimary },
+  criteriaOp: { fontSize: 14, color: colors.accent, fontFamily: "Inter_700Bold", minWidth: 20, textAlign: "center" },
+  criteriaValue: { fontSize: 14, fontFamily: "Inter_700Bold", color: colors.textPrimary },
+
   card: {
-    backgroundColor: colors.card,
-    borderRadius: layout.cardRadius,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    marginBottom: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    backgroundColor: colors.card, borderRadius: layout.cardRadius, borderWidth: 1,
+    borderColor: colors.border, padding: 16, marginBottom: 10,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
   },
   cardTitle: { ...typography.heading3 },
   cardArrow: { fontSize: 22, color: colors.textSecondary },
-
   addButton: { padding: 12, alignItems: "center", marginBottom: 8 },
   addButtonText: { color: colors.accent, fontFamily: "Inter_700Bold", fontSize: 15 },
 
-  /* Symbol list (edit mode) */
   symbolList: { marginBottom: 16 },
   symbolRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: colors.card,
-    borderRadius: layout.cardRadius,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 8,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    backgroundColor: colors.card, borderRadius: layout.cardRadius, borderWidth: 1,
+    borderColor: colors.border, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 8,
   },
   symbolText: { fontFamily: "Inter_700Bold", fontSize: 15, color: colors.textPrimary },
   symbolCompany: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   deleteBtn: { padding: 4 },
-
-  /* Symbol chip grid (normal mode) */
-  symbolGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 24 },
-  symbolChip: {
-    backgroundColor: colors.card,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    alignItems: "center",
-  },
-  symbolChipText: { ...typography.body, fontFamily: "Inter_700Bold" },
-  symbolExchange: { fontSize: 10, color: colors.textMuted, marginTop: 2 },
 });

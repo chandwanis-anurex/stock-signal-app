@@ -72,7 +72,7 @@ def create_watchlist_manual(payload: dict, db: Session = Depends(get_db), curren
 @router.get("/watchlists")
 def list_watchlists(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     watchlists = db.query(Watchlist).filter(Watchlist.user_id == current_user.id).all()
-    return [{"id": w.id, "name": w.name, "last_run_at": w.last_run_at} for w in watchlists]
+    return [{"id": w.id, "name": w.name, "last_run_at": w.last_run_at, "screener_criteria": w.screener_criteria} for w in watchlists]
 
 
 @router.delete("/watchlists/{watchlist_id}")
@@ -92,6 +92,8 @@ def update_watchlist(watchlist_id: int, payload: dict, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Watchlist not found")
     if "name" in payload:
         wl.name = payload["name"]
+    if "criteria" in payload:
+        wl.screener_criteria = payload["criteria"]
     db.commit()
     return {"id": wl.id, "name": wl.name}
 
