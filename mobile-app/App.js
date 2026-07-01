@@ -22,6 +22,7 @@ import AnalyticsScreen from "./screens/AnalyticsScreen";
 import HelpScreen from "./screens/HelpScreen";
 import ManualWatchlistScreen from "./screens/ManualWatchlistScreen";
 import OnboardingScreen from "./screens/OnboardingScreen";
+import HomeScreen from "./screens/HomeScreen";
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -41,7 +42,7 @@ const navTheme = {
 function HeaderLogo() {
   const navigation = useNavigation();
   return (
-    <TouchableOpacity onPress={() => navigation.navigate("HowItWorks")} style={{ marginRight: 12 }}>
+    <TouchableOpacity onPress={() => navigation.navigate("Home")} style={{ marginRight: 12 }}>
       <Logo size={36} />
     </TouchableOpacity>
   );
@@ -110,7 +111,7 @@ function AccountStackScreen({ onLogout }) {
       </AccountStack.Screen>
       <AccountStack.Screen name="Help" component={HelpScreen} options={{ title: "Help & About" }} />
       <AccountStack.Screen name="HowItWorks" options={{ title: "How It Works" }}>
-        {() => <OnboardingScreen onDone={() => {}} />}
+        {(props) => <OnboardingScreen {...props} onDone={() => props.navigation.goBack()} />}
       </AccountStack.Screen>
     </AccountStack.Navigator>
   );
@@ -129,6 +130,19 @@ function MainApp({ onLogout }) {
         headerRight: headerLogo,
       }}
     >
+      <Tabs.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.textPrimary,
+          headerTitleStyle: { fontFamily: "Inter_700Bold" },
+          headerRight: headerLogo,
+          title: "SignalFlow",
+        }}
+      />
       <Tabs.Screen
         name="WatchlistsTab"
         component={WatchlistsStack}
