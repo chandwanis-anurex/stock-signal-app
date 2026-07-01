@@ -5,6 +5,7 @@ import { NavigationContainer, DarkTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth } from "./api/client";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "./theme";
@@ -20,6 +21,7 @@ import SignalFeedScreen from "./screens/SignalFeedScreen";
 import AnalyticsScreen from "./screens/AnalyticsScreen";
 import HelpScreen from "./screens/HelpScreen";
 import ManualWatchlistScreen from "./screens/ManualWatchlistScreen";
+import OnboardingScreen from "./screens/OnboardingScreen";
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -74,6 +76,9 @@ function AccountScreen({ onLogout, navigation }) {
         <Text style={styles.accountTitle}>SignalFlow</Text>
         <Text style={styles.accountSubtitle}>Algorithmic stock alerts, simplified</Text>
       </View>
+      <TouchableOpacity onPress={() => navigation.navigate("HowItWorks")} style={styles.helpButton}>
+        <Text style={styles.helpButtonText}>How SignalFlow Works</Text>
+      </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate("Help")} style={styles.helpButton}>
         <Text style={styles.helpButtonText}>Help & About</Text>
       </TouchableOpacity>
@@ -92,6 +97,9 @@ function AccountStackScreen({ onLogout }) {
         {(props) => <AccountScreen {...props} onLogout={onLogout} />}
       </AccountStack.Screen>
       <AccountStack.Screen name="Help" component={HelpScreen} options={{ title: "Help & About" }} />
+      <AccountStack.Screen name="HowItWorks" options={{ title: "How It Works" }}>
+        {() => <OnboardingScreen onDone={() => {}} />}
+      </AccountStack.Screen>
     </AccountStack.Navigator>
   );
 }
@@ -138,11 +146,16 @@ function MainApp({ onLogout }) {
 export default function App() {
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [onboarded, setOnboarded] = useState(false);
   const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold });
 
   useEffect(() => {
-    auth.getToken().then((token) => {
+    Promise.all([
+      auth.getToken(),
+      AsyncStorage.getItem("sf_onboarded"),
+    ]).then(([token, ob]) => {
       setAuthenticated(!!token);
+      setOnboarded(!!ob);
       setReady(true);
     });
   }, []);
@@ -159,9 +172,13 @@ export default function App() {
     return <AuthScreen onAuthenticated={() => setAuthenticated(true)} />;
   }
 
+  if (!onboarded) {
+    return <OnboardingScreen onDone={() => setOnboarded(true)} />;
+  }
+
   return (
     <NavigationContainer theme={navTheme}>
-      <MainApp onLogout={() => setAuthenticated(false)} />
+      <MainApp onLogout={() => { setAuthenticated(false); setOnboarded(false); }} />
     </NavigationContainer>
   );
 }
