@@ -12,7 +12,16 @@ router = APIRouter(prefix="/signals", tags=["signals"])
 @router.get("/rules")
 def list_all_rules(db: Session = Depends(get_db)):
     rules = db.query(Rule).filter(Rule.active == True).all()  # noqa: E712
-    return [{"id": r.id, "name": r.name, "watchlist_id": r.watchlist_id} for r in rules]
+    return [
+        {
+            "id": r.id,
+            "name": r.name,
+            "watchlist_id": r.watchlist_id,
+            "buy_condition": r.buy_condition,
+            "sell_condition": r.sell_condition,
+        }
+        for r in rules
+    ]
 
 
 @router.get("")

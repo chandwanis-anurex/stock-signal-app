@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { api } from "../api/client";
 import { colors, typography, layout } from "../theme";
 import Dropdown from "../components/Dropdown";
@@ -81,9 +82,15 @@ function TermCard({ term, index, onChange, onRemove, showRemove, side }) {
   );
 }
 
+const NEW_RULE = "__new__";
+
 export default function RuleBuilderScreen({ route, navigation }) {
   const { watchlistId, existingRule } = route.params;
   const isEditing = !!existingRule;
+
+  const [templates, setTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const [selectedTemplate, setSelectedTemplate] = useState(NEW_RULE);
 
   const [name, setName] = useState(existingRule?.name ?? "");
   const [buyTerms, setBuyTerms] = useState(
@@ -99,9 +106,39 @@ export default function RuleBuilderScreen({ route, navigation }) {
     existingRule?.sell_condition?.stop_loss_pct != null ? String(existingRule.sell_condition.stop_loss_pct) : ""
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     navigation.setOptions({ title: isEditing ? existingRule.name : "New Rule" });
+    if (!isEditing) {
+      api.listAllRules().then((rules) => {
+        setTemplates(rules);
+      }).catch(() => {}).finally(() => setLoadingTemplates(false));
+    } else {
+      setLoadingTemplates(false);
+    }
   }, []);
+
+  const applyTemplate = (templateId) => {
+    setSelectedTemplate(templateId);
+    if (templateId === NEW_RULE) {
+      setName("");
+      setBuyTerms([{ indicator: "RSI", params: { period: 14 }, operator: "lt", value: "30" }]);
+      setSellTerms([{ indicator: "RSI", params: { period: 14 }, operator: "gt", value: "70" }]);
+      setTakeProfitPct("");
+      setStopLossPct("");
+      return;
+    }
+    const rule = templates.find((r) => String(r.id) === templateId);
+    if (!rule) return;
+    setName(rule.name);
+    if (rule.buy_condition?.terms?.length) {
+      setBuyTerms(rule.buy_condition.terms.map((t) => ({ ...t, value: String(t.value) })));
+    }
+    if (rule.sell_condition?.terms?.length) {
+      setSellTerms(rule.sell_condition.terms.map((t) => ({ ...t, value: String(t.value) })));
+    }
+    setTakeProfitPct(rule.sell_condition?.take_profit_pct != null ? String(rule.sell_condition.take_profit_pct) : "");
+    setStopLossPct(rule.sell_condition?.stop_loss_pct != null ? String(rule.sell_condition.stop_loss_pct) : "");
+  };
 
   const updateTerm = (list, setList, index, updated) => {
     const next = [...list];
@@ -129,8 +166,36 @@ export default function RuleBuilderScreen({ route, navigation }) {
     }
   };
 
+  const templateOptions = [
+    { value: NEW_RULE, label: "— Create new rule set —" },
+    ...templates.map((r) => ({ value: String(r.id), label: r.name })),
+  ];
+
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+
+      {/* Template picker — only shown when creating a new rule */}
+      {!isEditing && (
+        <View style={styles.templateCard}>
+          <View style={styles.templateHeader}>
+            <Ionicons name="copy-outline" size={16} color={colors.accent} />
+            <Text style={styles.templateTitle}>Start from an existing rule set</Text>
+          </View>
+          {loadingTemplates ? (
+            <ActivityIndicator size="small" color={colors.accent} style={{ marginTop: 8 }} />
+          ) : templates.length === 0 ? (
+            <Text style={styles.templateEmpty}>No existing rule sets yet — fill in the form below to create your first.</Text>
+          ) : (
+            <Dropdown
+              label="Rule Set"
+              value={selectedTemplate}
+              options={templateOptions}
+              onChange={applyTemplate}
+            />
+          )}
+        </View>
+      )}
+
       <Text style={styles.inputLabel}>Rule Name</Text>
       <TextInput
         style={styles.input}
@@ -212,6 +277,19 @@ export default function RuleBuilderScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: layout.screenPadding },
+
+  templateCard: {
+    backgroundColor: colors.card,
+    borderRadius: layout.cardRadius,
+    borderWidth: 1,
+    borderColor: colors.accent + "44",
+    padding: 14,
+    marginBottom: 20,
+  },
+  templateHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  templateTitle: { fontSize: 13, fontFamily: "Inter_700Bold", color: colors.accent },
+  templateEmpty: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+
   inputLabel: { ...typography.label, marginBottom: 6 },
   input: {
     backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
