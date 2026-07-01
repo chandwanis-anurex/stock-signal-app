@@ -8,6 +8,7 @@ rate limits / Terms of Service. Use it for discovery only; the indicator
 engine pulls its actual price data from the dedicated market data provider,
 not from this package.
 """
+import math
 from typing import List, Dict
 from app.schemas import ScreenerCriteria
 
@@ -62,4 +63,11 @@ def run_screener(criteria: ScreenerCriteria) -> List[Dict]:
     total_count, _ = query.limit(1).get_scanner_data()
     _, df = query.limit(min(criteria.limit, total_count)).get_scanner_data()
 
-    return df.to_dict(orient="records")
+    records = df.to_dict(orient="records")
+    for row in records:
+        for key, value in row.items():
+            # TradingView returns NaN/Infinity for tickers missing this field
+            # (e.g. no market cap data); FastAPI's JSON encoder rejects those.
+            if isinstance(value, float) and not math.isfinite(value):
+                row[key] = None
+    return records
