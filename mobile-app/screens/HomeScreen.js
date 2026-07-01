@@ -27,7 +27,12 @@ const ARROWS = [
   { angle: -135, rotate: "315deg" },
 ];
 
-const NAV_TARGETS = ["WatchlistsTab", "RulesTab", "Signals", "Analytics"];
+const NAV_TARGETS = [
+  { tab: "WatchlistsTab", screen: "Screener" }, // Screen Stocks → open screener directly
+  { tab: "RulesTab" },                           // Define Rules
+  { tab: "Signals" },                            // Execute Trades
+  { tab: "Analytics" },                          // Analyze Performance
+];
 
 function toRad(d) { return (d * Math.PI) / 180; }
 
@@ -82,7 +87,12 @@ export default function HomeScreen({ navigation }) {
             <TouchableOpacity
               key={i}
               style={[styles.tile, { left: tx, top: ty, width: TILE, height: TILE, borderColor: tile.color + "66", shadowColor: tile.color }]}
-              onPress={() => navigation.navigate(NAV_TARGETS[i])}
+              onPress={() => {
+                const t = NAV_TARGETS[i];
+                t.screen
+                  ? navigation.navigate(t.tab, { screen: t.screen })
+                  : navigation.navigate(t.tab);
+              }}
               activeOpacity={0.7}
             >
               <View style={[styles.iconWrap, { backgroundColor: tile.color + "22" }]}>
