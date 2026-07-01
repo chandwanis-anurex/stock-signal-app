@@ -1,12 +1,13 @@
 import React, { useCallback, useRef, useState } from "react";
-import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Animated } from "react-native";
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Animated, Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
+import { Ionicons } from "@expo/vector-icons";
 import { api } from "../api/client";
 import { colors, typography, layout } from "../theme";
 import { getCompanyName } from "../data/companyNames";
 
-export default function SignalFeedScreen() {
+export default function SignalFeedScreen({ navigation }) {
   const [signals, setSignals] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -42,8 +43,30 @@ export default function SignalFeedScreen() {
     </TouchableOpacity>
   );
 
+  const haltAll = () => {
+    Alert.alert(
+      "Halt All Trading Alerts",
+      "This will stop ALL active rules on ALL watchlists. You will need to restart each watchlist individually. Continue?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Halt All", style: "destructive", onPress: async () => {
+          try {
+            const res = await api.haltAllWatchlists();
+            Alert.alert("Done", `${res.halted} watchlist${res.halted !== 1 ? "s" : ""} halted. Go to Watchlists to restart them.`);
+          } catch (e) {
+            Alert.alert("Error", e.message);
+          }
+        }},
+      ]
+    );
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
+      <TouchableOpacity style={styles.haltBtn} onPress={haltAll}>
+        <Ionicons name="stop-circle" size={18} color="#fff" />
+        <Text style={styles.haltBtnText}>Halt All Trading Alerts</Text>
+      </TouchableOpacity>
       <FlatList
         data={signals}
         keyExtractor={(item) => String(item.id)}
@@ -77,9 +100,12 @@ export default function SignalFeedScreen() {
         }}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📡</Text>
+            <Ionicons name="flash-outline" size={48} color={colors.textMuted} />
             <Text style={styles.emptyTitle}>No signals yet</Text>
-            <Text style={styles.emptySub}>Signals fire when your rules match stocks in your watchlists.</Text>
+            <Text style={styles.emptySub}>
+              Activate a rule on a watchlist to start receiving trade alerts here.
+              {"\n\n"}Go to Watchlists → tap a watchlist → press Start to begin.
+            </Text>
           </View>
         }
       />
@@ -89,6 +115,12 @@ export default function SignalFeedScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  haltBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: colors.sell, margin: 16, marginBottom: 8,
+    padding: 14, borderRadius: layout.buttonRadius,
+  },
+  haltBtnText: { color: "#fff", fontFamily: "Inter_800ExtraBold", fontSize: 15 },
   list: { padding: layout.screenPadding },
   card: {
     backgroundColor: colors.card,

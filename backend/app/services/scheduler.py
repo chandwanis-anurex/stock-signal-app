@@ -1,20 +1,9 @@
-"""
-Wires up the periodic jobs:
-  1. Re-run each active watchlist's screener on its configured interval.
-  2. Evaluate each active rule against its watchlist's symbols, fire signals
-     on false->true transitions, and dispatch alerts.
-  3. Update signal performance checkpoints.
-
-MVP uses APScheduler in-process. For production scale (many users / many
-symbols), move this to Celery + Redis so jobs can run on separate workers
-and you can control concurrency against market-data rate limits.
-"""
 import os
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.database import SessionLocal
-from app.models.models import Watchlist, Rule, WatchlistSymbol, Signal
+from app.models.models import AlertChannel, Watchlist, Rule, WatchlistSymbol, Signal
 from app.schemas import ScreenerCriteria, ConditionGroup
 from app.services.screener_service import run_screener
 from app.services.indicator_engine import evaluate_symbol
@@ -24,37 +13,66 @@ from app.services.analytics_service import update_due_checkpoints
 
 
 def refresh_watchlists():
+    """Re-run screener for each watchlist that has criteria. Preserves manually-added symbols."""
     db = SessionLocal()
     try:
-        watchlists = db.query(Watchlist).filter(Watchlist.active == True).all()  # noqa: E712
-        for wl in watchlists:
-            criteria = ScreenerCriteria(**wl.screener_criteria)
-            results = run_screener(criteria)
+        watchlists = db.query(Watchlist).filter(
+            Watchlist.active == True,  # noqa: E712
+            Watchlist.screener_criteria.isnot(None),
+        ).all()
 
-            db.query(WatchlistSymbol).filter(WatchlistSymbol.watchlist_id == wl.id).delete()
-            for row in results:
-                db.add(WatchlistSymbol(
-                    watchlist_id=wl.id,
-                    symbol=row.get("name"),
-                    exchange=row.get("exchange", ""),
-                ))
-            wl.last_run_at = datetime.utcnow()
-            db.commit()
+        for wl in watchlists:
+            try:
+                criteria = ScreenerCriteria(**wl.screener_criteria)
+                results = run_screener(criteria)
+                new_syms = {row.get("name"): row for row in results if row.get("name")}
+
+                # Remove old screener symbols; keep is_manual ones
+                db.query(WatchlistSymbol).filter(
+                    WatchlistSymbol.watchlist_id == wl.id,
+                    WatchlistSymbol.is_manual == False,  # noqa: E712
+                ).delete()
+
+                manual = {s.symbol for s in db.query(WatchlistSymbol).filter(
+                    WatchlistSymbol.watchlist_id == wl.id
+                ).all()}
+
+                for sym, row in new_syms.items():
+                    if sym not in manual:
+                        db.add(WatchlistSymbol(
+                            watchlist_id=wl.id,
+                            symbol=sym,
+                            exchange=row.get("exchange", ""),
+                            company_name=row.get("description", ""),
+                            is_manual=False,
+                        ))
+
+                wl.last_run_at = datetime.utcnow()
+                db.commit()
+            except Exception:
+                db.rollback()
     finally:
         db.close()
 
 
 def evaluate_rules():
+    """Evaluate active rules on their watchlists and fire signals on transitions."""
     db = SessionLocal()
     try:
         provider = get_provider()
-        rules = db.query(Rule).filter(Rule.active == True).all()  # noqa: E712
 
-        for rule in rules:
-            symbols = db.query(WatchlistSymbol).filter(
-                WatchlistSymbol.watchlist_id == rule.watchlist_id
-            ).all()
+        # Only process watchlists that have an active rule assignment
+        watchlists = db.query(Watchlist).filter(
+            Watchlist.rule_id.isnot(None),
+            Watchlist.rule_active == True,  # noqa: E712
+        ).all()
 
+        for wl in watchlists:
+            rule = db.query(Rule).filter(Rule.id == wl.rule_id).first()
+            if not rule:
+                continue
+
+            symbols = db.query(WatchlistSymbol).filter(WatchlistSymbol.watchlist_id == wl.id).all()
             buy_cond = ConditionGroup(**rule.buy_condition) if rule.buy_condition else None
             sell_cond = ConditionGroup(**rule.sell_condition) if rule.sell_condition else None
             state = rule.last_state or {}
@@ -69,9 +87,9 @@ def evaluate_rules():
                 prev = state.get(symbol, {"buy": False, "sell": False})
 
                 if result["buy"] and not prev["buy"]:
-                    _fire_signal(db, rule, symbol, "buy", result)
+                    _fire_signal(db, rule, wl, symbol, "buy", result)
                 if result["sell"] and not prev["sell"]:
-                    _fire_signal(db, rule, symbol, "sell", result)
+                    _fire_signal(db, rule, wl, symbol, "sell", result)
 
                 state[symbol] = {"buy": result["buy"], "sell": result["sell"]}
 
@@ -81,7 +99,7 @@ def evaluate_rules():
         db.close()
 
 
-def _fire_signal(db, rule: Rule, symbol: str, side: str, result: dict):
+def _fire_signal(db, rule: Rule, watchlist: Watchlist, symbol: str, side: str, result: dict):
     signal = Signal(
         rule_id=rule.id,
         symbol=symbol,
@@ -93,12 +111,17 @@ def _fire_signal(db, rule: Rule, symbol: str, side: str, result: dict):
     db.commit()
     db.refresh(signal)
 
-    for channel in rule.alert_channels:
-        if channel.active:
-            try:
-                dispatch(channel, signal)
-            except Exception:
-                continue
+    # Use watchlist-level alert channels (new model)
+    channels = db.query(AlertChannel).filter(
+        AlertChannel.watchlist_id == watchlist.id,
+        AlertChannel.active == True,  # noqa: E712
+    ).all()
+
+    for channel in channels:
+        try:
+            dispatch(channel, signal)
+        except Exception:
+            continue
 
 
 def run_analytics_update():

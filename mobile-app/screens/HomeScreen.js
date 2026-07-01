@@ -1,178 +1,113 @@
 import React, { useRef, useEffect } from "react";
-import {
-  View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Logo from "../components/Logo";
 import { colors } from "../theme";
 
-const { width } = Dimensions.get("window");
-const SIZE = Math.min(width - 40, 360);
-const RADIUS = SIZE * 0.34;
-const TILE_W = SIZE * 0.30;
-const TILE_H = SIZE * 0.26;
+const { width, height } = Dimensions.get("window");
+const SIZE = Math.min(width - 32, 370);
+const R = SIZE * 0.33;          // tile center radius
+const TILE = SIZE * 0.34;       // tile width & height — large squares
 const CX = SIZE / 2;
 const CY = SIZE / 2;
 
 const TILES = [
-  {
-    label: "Screen\nStocks",
-    icon: "funnel",
-    color: colors.accent,
-    angle: -90, // top
-    tab: "WatchlistsTab",
-  },
-  {
-    label: "Define\nRules",
-    icon: "git-branch",
-    color: "#a78bfa",
-    angle: 0, // right
-    tab: "WatchlistsTab",
-  },
-  {
-    label: "Execute\nTrades",
-    icon: "flash",
-    color: colors.buy,
-    angle: 90, // bottom
-    tab: "Signals",
-  },
-  {
-    label: "Analyze\nPerformance",
-    icon: "bar-chart",
-    color: "#38bdf8",
-    angle: 180, // left
-    tab: "Analytics",
-  },
+  { label: "Screen\nStocks",       icon: "funnel",      color: colors.accent,  angle: -90 },
+  { label: "Define\nRules",        icon: "git-branch",  color: "#a78bfa",      angle: 0   },
+  { label: "Execute\nTrades",      icon: "flash",       color: colors.buy,     angle: 90  },
+  { label: "Analyze\nPerformance", icon: "bar-chart",   color: "#38bdf8",      angle: 180 },
 ];
 
-// Arrow chevrons placed halfway between each pair of tiles (at 45° offsets)
+// Curved arrows sit on the orbit ring between each pair of tiles
+// angle = position on orbit, rotate = direction the chevron points (clockwise)
 const ARROWS = [
-  { angle: -45, rotate: "45deg" },  // top → right
-  { angle: 45,  rotate: "135deg" }, // right → bottom
-  { angle: 135, rotate: "225deg" }, // bottom → left
-  { angle: -135, rotate: "315deg" }, // left → top
+  { angle: -45,  rotate: "45deg"  },
+  { angle:  45,  rotate: "135deg" },
+  { angle:  135, rotate: "225deg" },
+  { angle: -135, rotate: "315deg" },
 ];
 
-function toRad(deg) { return (deg * Math.PI) / 180; }
+const NAV_TARGETS = ["WatchlistsTab", "RulesTab", "Signals", "Analytics"];
+
+function toRad(d) { return (d * Math.PI) / 180; }
 
 export default function HomeScreen({ navigation }) {
   const pulse = useRef(new Animated.Value(1)).current;
-  const spin = useRef(new Animated.Value(0)).current;
+  const spin  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1.07, duration: 1800, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 1,    duration: 1800, useNativeDriver: true }),
+    ])).start();
     Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.06, duration: 1800, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 1800, useNativeDriver: true }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.timing(spin, { toValue: 1, duration: 20000, useNativeDriver: true })
+      Animated.timing(spin, { toValue: 1, duration: 22000, useNativeDriver: true })
     ).start();
   }, []);
 
   const spinDeg = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
-
-  const navigate = (tab) => {
-    navigation.navigate(tab);
-  };
+  const orbitR  = R + TILE * 0.08;
 
   return (
     <View style={styles.root}>
-      {/* Title */}
-      <Text style={styles.pageTitle}>Your Trading Dashboard</Text>
-      <Text style={styles.pageSubtitle}>Tap any step to get started</Text>
+      <Text style={styles.title}>SignalFlow</Text>
+      <Text style={styles.sub}>Tap a pillar to get started</Text>
 
-      {/* Circle diagram */}
       <View style={[styles.diagram, { width: SIZE, height: SIZE }]}>
-
-        {/* Rotating dashed orbit */}
+        {/* Rotating dashed orbit ring */}
         <Animated.View style={[styles.orbit, {
-          width: RADIUS * 2 + TILE_W * 0.6,
-          height: RADIUS * 2 + TILE_W * 0.6,
-          borderRadius: RADIUS + TILE_W * 0.3,
-          left: CX - RADIUS - TILE_W * 0.3,
-          top: CY - RADIUS - TILE_W * 0.3,
+          width: orbitR * 2, height: orbitR * 2,
+          borderRadius: orbitR,
+          left: CX - orbitR, top: CY - orbitR,
           transform: [{ rotate: spinDeg }],
         }]} />
 
-        {/* Arrow indicators between tiles */}
-        {ARROWS.map((arr, i) => {
-          const x = CX + RADIUS * 0.72 * Math.cos(toRad(arr.angle));
-          const y = CY + RADIUS * 0.72 * Math.sin(toRad(arr.angle));
+        {/* Directional arrows between tiles */}
+        {ARROWS.map((a, i) => {
+          const x = CX + orbitR * Math.cos(toRad(a.angle));
+          const y = CY + orbitR * Math.sin(toRad(a.angle));
           return (
-            <View key={i} style={[styles.arrowWrap, { left: x - 12, top: y - 12, transform: [{ rotate: arr.rotate }] }]}>
-              <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+            <View key={i} style={[styles.arrow, { left: x - 10, top: y - 10, transform: [{ rotate: a.rotate }] }]}>
+              <Ionicons name="chevron-forward" size={18} color={colors.accent + "99"} />
             </View>
           );
         })}
 
-        {/* Tiles */}
+        {/* Four pillar tiles */}
         {TILES.map((tile, i) => {
           const rad = toRad(tile.angle);
-          const tx = CX + RADIUS * Math.cos(rad) - TILE_W / 2;
-          const ty = CY + RADIUS * Math.sin(rad) - TILE_H / 2;
+          const tx  = CX + R * Math.cos(rad) - TILE / 2;
+          const ty  = CY + R * Math.sin(rad) - TILE / 2;
           return (
             <TouchableOpacity
               key={i}
-              style={[styles.tile, {
-                left: tx, top: ty, width: TILE_W, height: TILE_H,
-                borderColor: tile.color + "55",
-                shadowColor: tile.color,
-              }]}
-              onPress={() => navigate(tile.tab)}
-              activeOpacity={0.75}
+              style={[styles.tile, { left: tx, top: ty, width: TILE, height: TILE, borderColor: tile.color + "66", shadowColor: tile.color }]}
+              onPress={() => navigation.navigate(NAV_TARGETS[i])}
+              activeOpacity={0.7}
             >
-              <View style={[styles.tileIcon, { backgroundColor: tile.color + "22" }]}>
-                <Ionicons name={tile.icon} size={20} color={tile.color} />
+              <View style={[styles.iconWrap, { backgroundColor: tile.color + "22" }]}>
+                <Ionicons name={tile.icon} size={30} color={tile.color} />
               </View>
               <Text style={[styles.tileLabel, { color: tile.color }]}>{tile.label}</Text>
             </TouchableOpacity>
           );
         })}
 
-        {/* Center */}
+        {/* Centre logo */}
         <Animated.View style={[styles.center, { transform: [{ scale: pulse }] }]}>
-          <Logo size={42} />
-          <Text style={styles.centerName}>SignalFlow</Text>
+          <Logo size={44} />
+          <Text style={styles.centerText}>SignalFlow</Text>
         </Animated.View>
-      </View>
-
-      {/* Step legend */}
-      <View style={styles.legend}>
-        {TILES.map((tile, i) => (
-          <TouchableOpacity key={i} style={styles.legendRow} onPress={() => navigate(tile.tab)}>
-            <View style={[styles.legendDot, { backgroundColor: tile.color }]} />
-            <Text style={styles.legendNum}>{i + 1}</Text>
-            <Text style={styles.legendLabel}>{tile.label.replace("\n", " ")}</Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.textMuted} style={{ marginLeft: "auto" }} />
-          </TouchableOpacity>
-        ))}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    alignItems: "center",
-    paddingTop: 24,
-  },
-  pageTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_800ExtraBold",
-    color: colors.textPrimary,
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  pageSubtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 28,
-  },
+  root: { flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" },
+
+  title: { fontSize: 26, fontFamily: "Inter_800ExtraBold", color: colors.textPrimary, letterSpacing: -1, marginBottom: 4 },
+  sub:   { fontSize: 13, color: colors.textSecondary, marginBottom: 28 },
 
   diagram: { position: "relative" },
 
@@ -183,84 +118,46 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
   },
 
-  arrowWrap: { position: "absolute" },
+  arrow: { position: "absolute" },
 
   tile: {
     position: "absolute",
     backgroundColor: colors.card,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 18,
+    borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-    padding: 8,
+    gap: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+    padding: 10,
   },
-  tileIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  iconWrap: {
+    width: 52, height: 52,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
   },
   tileLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
     textAlign: "center",
-    lineHeight: 14,
+    lineHeight: 16,
   },
 
   center: {
     position: "absolute",
-    left: CX - 54,
-    top: CY - 54,
-    width: 108,
-    height: 108,
-    borderRadius: 54,
+    left: CX - 56, top: CY - 56,
+    width: 112, height: 112,
+    borderRadius: 56,
     backgroundColor: colors.card,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
   },
-  centerName: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-    color: colors.accent,
-    letterSpacing: 0.5,
-  },
-
-  legend: {
-    width: "100%",
-    paddingHorizontal: 24,
-    marginTop: 28,
-    gap: 10,
-  },
-  legendRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendNum: {
-    fontSize: 12,
-    fontFamily: "Inter_800ExtraBold",
-    color: colors.textMuted,
-    width: 14,
-  },
-  legendLabel: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: colors.textPrimary,
-  },
+  centerText: { fontSize: 10, fontFamily: "Inter_700Bold", color: colors.accent, letterSpacing: 0.5 },
 });

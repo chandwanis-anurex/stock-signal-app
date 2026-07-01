@@ -1,17 +1,25 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.database import get_db
-from app.schemas import RuleCreate, AlertChannelCreate
-from app.models.models import Rule, AlertChannel
+from app.models.models import Rule, Watchlist, User
+from app.schemas import RuleCreate
 
-router = APIRouter(prefix="/watchlists/{watchlist_id}/rules", tags=["rules"])
+# Standalone rules — independent of any specific watchlist
+router = APIRouter(prefix="/rules", tags=["rules"])
+
+
+@router.get("")
+def list_rules(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    rules = db.query(Rule).filter(Rule.user_id == current_user.id).order_by(Rule.id).all()
+    return [_rule_summary(r, db) for r in rules]
 
 
 @router.post("")
-def create_rule(watchlist_id: int, payload: RuleCreate, db: Session = Depends(get_db)):
+def create_rule(payload: RuleCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     rule = Rule(
-        watchlist_id=watchlist_id,
+        user_id=current_user.id,
         name=payload.name,
         buy_condition=payload.buy_condition.model_dump() if payload.buy_condition else None,
         sell_condition=payload.sell_condition.model_dump() if payload.sell_condition else None,
@@ -19,79 +27,99 @@ def create_rule(watchlist_id: int, payload: RuleCreate, db: Session = Depends(ge
     db.add(rule)
     db.commit()
     db.refresh(rule)
-    return {"id": rule.id, "name": rule.name}
+    return _rule_detail(rule)
 
 
-@router.get("")
-def list_rules(watchlist_id: int, db: Session = Depends(get_db)):
+@router.get("/{rule_id}")
+def get_rule(rule_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    rule = _get_owned(rule_id, db, current_user)
+    return _rule_detail(rule)
+
+
+@router.patch("/{rule_id}")
+def update_rule(rule_id: int, payload: RuleCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    rule = _get_owned(rule_id, db, current_user)
+    rule.name = payload.name
+    if payload.buy_condition:
+        rule.buy_condition = payload.buy_condition.model_dump()
+    if payload.sell_condition:
+        rule.sell_condition = payload.sell_condition.model_dump()
+    rule.last_state = {}  # reset state so rules re-evaluate from scratch
+
+    # Stop all watchlists that were running this rule
+    affected = db.query(Watchlist).filter(Watchlist.rule_id == rule_id, Watchlist.rule_active == True).all()  # noqa: E712
+    for wl in affected:
+        wl.rule_active = False
+    db.commit()
+
+    affected_names = [wl.name for wl in affected]
+    return {**_rule_detail(rule), "stopped_watchlists": affected_names}
+
+
+@router.delete("/{rule_id}")
+def delete_rule(rule_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    rule = _get_owned(rule_id, db, current_user)
+
+    # Clear rule assignment from any watchlists using it
+    using = db.query(Watchlist).filter(Watchlist.rule_id == rule_id).all()
+    for wl in using:
+        wl.rule_id = None
+        wl.rule_active = False
+    db.commit()
+
+    affected_names = [wl.name for wl in using]
+    db.delete(rule)
+    db.commit()
+    return {"deleted": rule_id, "cleared_from_watchlists": affected_names}
+
+
+# ── Legacy per-watchlist rule endpoints (kept for backward compat) ──────────
+
+legacy = APIRouter(prefix="/watchlists/{watchlist_id}/rules", tags=["rules-legacy"])
+
+
+@legacy.get("")
+def list_rules_legacy(watchlist_id: int, db: Session = Depends(get_db)):
     rules = db.query(Rule).filter(Rule.watchlist_id == watchlist_id).all()
     return [{"id": r.id, "name": r.name, "active": r.active} for r in rules]
 
 
-@router.get("/{rule_id}")
-def get_rule(watchlist_id: int, rule_id: int, db: Session = Depends(get_db)):
-    rule = db.query(Rule).filter(Rule.id == rule_id, Rule.watchlist_id == watchlist_id).first()
+@legacy.get("/{rule_id}")
+def get_rule_legacy(watchlist_id: int, rule_id: int, db: Session = Depends(get_db)):
+    rule = db.query(Rule).filter(Rule.id == rule_id).first()
     if not rule:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Rule not found")
+    return _rule_detail(rule)
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _get_owned(rule_id: int, db: Session, current_user: User) -> Rule:
+    rule = db.query(Rule).filter(Rule.id == rule_id, Rule.user_id == current_user.id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    return rule
+
+
+def _rule_summary(rule: Rule, db: Session) -> dict:
+    watchlist_count = db.query(Watchlist).filter(Watchlist.rule_id == rule.id).count()
+    active_count = db.query(Watchlist).filter(
+        Watchlist.rule_id == rule.id, Watchlist.rule_active == True  # noqa: E712
+    ).count()
     return {
         "id": rule.id,
         "name": rule.name,
-        "active": rule.active,
+        "watchlist_count": watchlist_count,
+        "active_count": active_count,
         "buy_condition": rule.buy_condition,
         "sell_condition": rule.sell_condition,
     }
 
 
-@router.get("/{rule_id}/alert-channels")
-def list_alert_channels(watchlist_id: int, rule_id: int, db: Session = Depends(get_db)):
-    channels = db.query(AlertChannel).filter(AlertChannel.rule_id == rule_id).all()
-    return [{"id": c.id, "channel_type": c.channel_type, "destination": c.destination, "active": c.active} for c in channels]
-
-
-@router.patch("/{rule_id}/alert-channels/{channel_id}")
-def update_alert_channel(watchlist_id: int, rule_id: int, channel_id: int, payload: AlertChannelCreate, db: Session = Depends(get_db)):
-    from fastapi import HTTPException
-    channel = db.query(AlertChannel).filter(AlertChannel.id == channel_id).first()
-    if not channel:
-        raise HTTPException(status_code=404, detail="Channel not found")
-    channel.destination = payload.destination
-    db.commit()
-    return {"id": channel.id, "channel_type": channel.channel_type, "destination": channel.destination}
-
-
-@router.post("/{rule_id}/alert-channels/{channel_id}/test")
-def test_alert_channel(watchlist_id: int, rule_id: int, channel_id: int, db: Session = Depends(get_db)):
-    from fastapi import HTTPException
-    from datetime import datetime
-    from app.services.alert_dispatcher import dispatch
-
-    channel = db.query(AlertChannel).filter(AlertChannel.id == channel_id).first()
-    if not channel:
-        raise HTTPException(status_code=404, detail="Channel not found")
-
-    class MockSignal:
-        symbol = "AAPL"
-        side = "buy"
-        price_at_signal = 195.42
-        fired_at = datetime.utcnow()
-        indicator_snapshot = {"rsi": 28.5, "close": 195.42}
-
-    try:
-        dispatch(channel, MockSignal())
-        return {"message": "Test alert sent"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/{rule_id}/alert-channels")
-def add_alert_channel(watchlist_id: int, rule_id: int, payload: AlertChannelCreate, db: Session = Depends(get_db)):
-    channel = AlertChannel(
-        rule_id=rule_id,
-        channel_type=payload.channel_type,
-        destination=payload.destination,
-    )
-    db.add(channel)
-    db.commit()
-    db.refresh(channel)
-    return {"id": channel.id, "channel_type": channel.channel_type}
+def _rule_detail(rule: Rule) -> dict:
+    return {
+        "id": rule.id,
+        "name": rule.name,
+        "buy_condition": rule.buy_condition,
+        "sell_condition": rule.sell_condition,
+    }

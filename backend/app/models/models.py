@@ -28,14 +28,22 @@ class Watchlist(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     name = Column(String, nullable=False)
-    screener_criteria = Column(JSON, nullable=False)  # structured filter DSL, see schemas.py
+    screener_criteria = Column(JSON, nullable=True)
     refresh_interval_seconds = Column(Integer, default=300)
     last_run_at = Column(DateTime, nullable=True)
     active = Column(Boolean, default=True)
+    # Rule assigned to this watchlist (one rule per watchlist)
+    rule_id = Column(Integer, ForeignKey("rules.id"), nullable=True)
+    rule_active = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="watchlists")
     symbols = relationship("WatchlistSymbol", back_populates="watchlist", cascade="all, delete-orphan")
-    rules = relationship("Rule", back_populates="watchlist", cascade="all, delete-orphan")
+    # Legacy: rules that list this watchlist as owner (old model)
+    legacy_rules = relationship("Rule", foreign_keys="Rule.watchlist_id", back_populates="legacy_watchlist")
+    # New: the assigned rule
+    rule = relationship("Rule", foreign_keys=[rule_id], post_update=True)
+    alert_channels = relationship("AlertChannel", foreign_keys="AlertChannel.watchlist_id",
+                                  back_populates="watchlist", cascade="all, delete-orphan")
 
 
 class WatchlistSymbol(Base):
@@ -44,8 +52,9 @@ class WatchlistSymbol(Base):
     id = Column(Integer, primary_key=True)
     watchlist_id = Column(Integer, ForeignKey("watchlists.id"))
     symbol = Column(String, nullable=False)
-    exchange = Column(String, nullable=False)
+    exchange = Column(String, nullable=False, default="")
     company_name = Column(String, nullable=False, default="")
+    is_manual = Column(Boolean, default=False)
     added_at = Column(DateTime, default=datetime.utcnow)
 
     watchlist = relationship("Watchlist", back_populates="symbols")
@@ -55,16 +64,20 @@ class Rule(Base):
     __tablename__ = "rules"
 
     id = Column(Integer, primary_key=True)
-    watchlist_id = Column(Integer, ForeignKey("watchlists.id"))
+    # user who owns this rule (standalone rules)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    # legacy: watchlist that owns this rule (old model, nullable going forward)
+    watchlist_id = Column(Integer, ForeignKey("watchlists.id"), nullable=True)
     name = Column(String, nullable=False)
-    buy_condition = Column(JSON, nullable=True)   # rules DSL, see indicator_engine.py
+    buy_condition = Column(JSON, nullable=True)
     sell_condition = Column(JSON, nullable=True)
     active = Column(Boolean, default=True)
-    # tracks last evaluated state per symbol so we only fire on a false->true transition
     last_state = Column(JSON, default=dict)
 
-    watchlist = relationship("Watchlist", back_populates="rules")
-    alert_channels = relationship("AlertChannel", back_populates="rule", cascade="all, delete-orphan")
+    legacy_watchlist = relationship("Watchlist", foreign_keys=[watchlist_id], back_populates="legacy_rules")
+    # Legacy alert channels (old model — channels were on rules)
+    legacy_alert_channels = relationship("AlertChannel", foreign_keys="AlertChannel.rule_id",
+                                         back_populates="legacy_rule", cascade="all, delete-orphan")
     signals = relationship("Signal", back_populates="rule", cascade="all, delete-orphan")
 
 
@@ -72,12 +85,16 @@ class AlertChannel(Base):
     __tablename__ = "alert_channels"
 
     id = Column(Integer, primary_key=True)
-    rule_id = Column(Integer, ForeignKey("rules.id"))
+    # New: channels belong to a watchlist
+    watchlist_id = Column(Integer, ForeignKey("watchlists.id"), nullable=True)
+    # Legacy: channels belonged to a rule
+    rule_id = Column(Integer, ForeignKey("rules.id"), nullable=True)
     channel_type = Column(String, nullable=False)  # sms | email | push | webhook
-    destination = Column(String, nullable=False)    # phone / email / device token / URL
+    destination = Column(String, nullable=False)
     active = Column(Boolean, default=True)
 
-    rule = relationship("Rule", back_populates="alert_channels")
+    watchlist = relationship("Watchlist", foreign_keys=[watchlist_id], back_populates="alert_channels")
+    legacy_rule = relationship("Rule", foreign_keys=[rule_id], back_populates="legacy_alert_channels")
 
 
 class Signal(Base):

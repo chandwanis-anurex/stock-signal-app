@@ -1,8 +1,23 @@
 import React, { useState, useCallback } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert } from "react-native";
+import {
+  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../api/client";
 import { colors, typography, layout } from "../theme";
+
+const MAX = 25;
+
+function StatusIcon({ ruleId, ruleActive }) {
+  if (!ruleId) {
+    return <Ionicons name="stop" size={22} color={colors.textMuted} />;
+  }
+  if (ruleActive) {
+    return <Ionicons name="play-circle" size={24} color={colors.buy} />;
+  }
+  return <Ionicons name="stop-circle" size={24} color={colors.sell} />;
+}
 
 export default function WatchlistsScreen({ navigation }) {
   const [watchlists, setWatchlists] = useState([]);
@@ -10,8 +25,7 @@ export default function WatchlistsScreen({ navigation }) {
 
   const load = useCallback(async () => {
     try {
-      const data = await api.listWatchlists();
-      setWatchlists(data);
+      setWatchlists(await api.listWatchlists());
     } catch (e) {
       console.warn(e);
     }
@@ -19,81 +33,105 @@ export default function WatchlistsScreen({ navigation }) {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
+  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
   const confirmDelete = (item) => {
     Alert.alert(
       "Delete Watchlist",
-      `Delete "${item.name}"? This will also remove its rules and signals.`,
+      `Delete "${item.name}"? This also removes its symbols and alert settings.`,
       [
         { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await api.deleteWatchlist(item.id);
-              setWatchlists((prev) => prev.filter((w) => w.id !== item.id));
-            } catch (e) {
-              Alert.alert("Delete failed", e.message);
-            }
-          },
-        },
+        { text: "Delete", style: "destructive", onPress: async () => {
+          try {
+            await api.deleteWatchlist(item.id);
+            setWatchlists(prev => prev.filter(w => w.id !== item.id));
+          } catch (e) {
+            Alert.alert("Delete failed", e.message);
+          }
+        }},
       ]
     );
+  };
+
+  const addManual = () => {
+    if (watchlists.length >= MAX) {
+      Alert.alert("Limit reached", `You can have at most ${MAX} watchlists.`);
+      return;
+    }
+    navigation.navigate("ManualWatchlist");
+  };
+
+  const openScreener = () => {
+    if (watchlists.length >= MAX) {
+      Alert.alert("Limit reached", `You can have at most ${MAX} watchlists.`);
+      return;
+    }
+    navigation.navigate("Screener");
   };
 
   return (
     <View style={styles.container}>
       <FlatList
         data={watchlists}
-        keyExtractor={(item) => String(item.id)}
+        keyExtractor={item => String(item.id)}
         contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.card}
-            onPress={() => navigation.navigate("WatchlistDetail", { watchlistId: item.id, name: item.name, criteria: item.screener_criteria })}
+            onPress={() => navigation.navigate("WatchlistDetail", { watchlistId: item.id })}
             onLongPress={() => confirmDelete(item)}
           >
-            <View style={styles.cardTop}>
+            <View style={styles.cardBody}>
               <Text style={styles.cardTitle}>{item.name}</Text>
-              <Text style={styles.cardArrow}>›</Text>
+              {item.rule_name
+                ? <Text style={styles.cardRule}>{item.rule_name}</Text>
+                : <Text style={styles.cardNoRule}>No rule attached</Text>
+              }
+              <Text style={styles.cardSub}>
+                Last run: {item.last_run_at ? new Date(item.last_run_at).toLocaleDateString() : "never"}
+              </Text>
             </View>
-            <Text style={styles.cardSub}>
-              Last run: {item.last_run_at ? new Date(item.last_run_at).toLocaleString() : "never"}
-            </Text>
-            <Text style={styles.cardHint}>Long-press to delete</Text>
+            <StatusIcon ruleId={item.rule_id} ruleActive={item.rule_active} />
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📋</Text>
+          <View style={styles.empty}>
+            <Ionicons name="list-outline" size={52} color={colors.textMuted} />
             <Text style={styles.emptyTitle}>No watchlists yet</Text>
-            <Text style={styles.emptySub}>Tap below to create your first screener-based watchlist.</Text>
+            <Text style={styles.emptySub}>
+              Use the Stock Screener to build a watchlist from criteria, or add symbols manually.
+            </Text>
+            <TouchableOpacity style={styles.emptyBtn} onPress={openScreener}>
+              <Text style={styles.emptyBtnText}>Open Stock Screener</Text>
+            </TouchableOpacity>
           </View>
         }
       />
-      <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={[styles.newButton, styles.newButtonHalf]}
-          onPress={() => Alert.alert(
-            "Create Watchlist",
-            "How do you want to add symbols?",
-            [
-              { text: "Use Screener", onPress: () => navigation.navigate("CriteriaBuilder") },
-              { text: "Enter Symbols", onPress: () => navigation.navigate("ManualWatchlist") },
-              { text: "Cancel", style: "cancel" },
-            ]
-          )}
-        >
-          <Text style={styles.newButtonText}>+ New Watchlist</Text>
+
+      {/* Status legend */}
+      <View style={styles.legend}>
+        <View style={styles.legendItem}>
+          <Ionicons name="play-circle" size={14} color={colors.buy} />
+          <Text style={styles.legendText}>Running</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <Ionicons name="stop-circle" size={14} color={colors.sell} />
+          <Text style={styles.legendText}>Stopped</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <Ionicons name="stop" size={14} color={colors.textMuted} />
+          <Text style={styles.legendText}>No rule</Text>
+        </View>
+      </View>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={[styles.footerBtn, styles.screenerBtn]} onPress={openScreener}>
+          <Ionicons name="funnel" size={16} color={colors.accent} />
+          <Text style={styles.screenerBtnText}>Screener</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.footerBtn, styles.manualBtn]} onPress={addManual}>
+          <Text style={styles.manualBtnText}>+ Add Watchlist</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -105,32 +143,34 @@ const styles = StyleSheet.create({
   list: { padding: layout.screenPadding, paddingBottom: 8 },
 
   card: {
-    backgroundColor: colors.card,
-    borderRadius: layout.cardRadius,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: colors.card, borderRadius: layout.cardRadius,
+    borderWidth: 1, borderColor: colors.border,
+    padding: 16, marginBottom: 10,
+    flexDirection: "row", alignItems: "center",
   },
-  cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  cardTitle: { ...typography.heading3 },
-  cardArrow: { fontSize: 22, color: colors.textSecondary },
-  cardSub: { ...typography.bodySmall, marginTop: 6 },
-  cardHint: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
+  cardBody: { flex: 1 },
+  cardTitle:  { fontSize: 16, fontFamily: "Inter_700Bold", color: colors.textPrimary, marginBottom: 2 },
+  cardRule:   { fontSize: 12, color: colors.accent,       fontFamily: "Inter_600SemiBold", marginBottom: 2 },
+  cardNoRule: { fontSize: 12, color: colors.textMuted,    fontFamily: "Inter_600SemiBold", marginBottom: 2 },
+  cardSub:    { fontSize: 11, color: colors.textMuted },
 
-  emptyState: { alignItems: "center", marginTop: 80, paddingHorizontal: 32 },
-  emptyIcon: { fontSize: 40, marginBottom: 16 },
-  emptyTitle: { ...typography.heading3, marginBottom: 8 },
+  empty: { alignItems: "center", marginTop: 60, paddingHorizontal: 32, gap: 12 },
+  emptyTitle: { ...typography.heading3 },
   emptySub: { ...typography.bodySmall, textAlign: "center", lineHeight: 20 },
+  emptyBtn: { borderWidth: 1, borderColor: colors.accent, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
+  emptyBtnText: { color: colors.accent, fontFamily: "Inter_700Bold", fontSize: 14 },
 
-  buttonRow: { flexDirection: "row", margin: 16, gap: 10 },
-  newButton: {
-    backgroundColor: colors.accent,
-    padding: 16,
-    alignItems: "center",
-    borderRadius: layout.buttonRadius,
-    flex: 1,
+  legend: {
+    flexDirection: "row", justifyContent: "center", gap: 20,
+    paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border,
   },
-  newButtonHalf: { flex: 1 },
-  newButtonText: { color: "#000", fontFamily: "Inter_800ExtraBold", fontSize: 16 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  legendText: { fontSize: 11, color: colors.textSecondary, fontFamily: "Inter_600SemiBold" },
+
+  footer: { flexDirection: "row", padding: 16, gap: 10 },
+  footerBtn: { flex: 1, padding: 15, alignItems: "center", borderRadius: layout.buttonRadius },
+  screenerBtn: { borderWidth: 1, borderColor: colors.accent, flexDirection: "row", gap: 6, justifyContent: "center" },
+  screenerBtnText: { color: colors.accent, fontFamily: "Inter_700Bold", fontSize: 15 },
+  manualBtn: { backgroundColor: colors.accent },
+  manualBtnText: { color: "#000", fontFamily: "Inter_800ExtraBold", fontSize: 15 },
 });

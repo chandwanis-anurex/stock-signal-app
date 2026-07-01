@@ -24,6 +24,7 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  // ── Auth ──────────────────────────────────────────────────────────────────
   register: (email, password) =>
     request("/auth/register", { method: "POST", body: JSON.stringify({ email, password }) }),
 
@@ -36,14 +37,12 @@ export const api = {
   resetPassword: (email, code, newPassword) =>
     request("/auth/reset-password", { method: "POST", body: JSON.stringify({ email, code, new_password: newPassword }) }),
 
-  updateWatchlist: (id, fields) =>
-    request(`/screener/watchlists/${id}`, { method: "PATCH", body: JSON.stringify(fields) }),
-
-  deleteWatchlistSymbol: (watchlistId, symbol) =>
-    request(`/screener/watchlists/${watchlistId}/symbols/${symbol}`, { method: "DELETE" }),
-
+  // ── Screener ──────────────────────────────────────────────────────────────
   runScreenerPreview: (criteria) =>
     request("/screener/run", { method: "POST", body: JSON.stringify(criteria) }),
+
+  // ── Watchlists ────────────────────────────────────────────────────────────
+  listWatchlists: () => request("/screener/watchlists"),
 
   createWatchlist: (name, criteria, refreshIntervalSeconds = 300) =>
     request("/screener/watchlists", {
@@ -57,45 +56,77 @@ export const api = {
       body: JSON.stringify({ name, symbols }),
     }),
 
-  listWatchlists: () => request("/screener/watchlists"),
+  updateWatchlist: (id, fields) =>
+    request(`/screener/watchlists/${id}`, { method: "PATCH", body: JSON.stringify(fields) }),
 
   deleteWatchlist: (watchlistId) =>
     request(`/screener/watchlists/${watchlistId}`, { method: "DELETE" }),
 
+  // ── Rule toggle / halt ────────────────────────────────────────────────────
+  toggleWatchlistRule: (watchlistId) =>
+    request(`/screener/watchlists/${watchlistId}/toggle`, { method: "POST" }),
+
+  haltAllWatchlists: () =>
+    request("/screener/watchlists/halt-all", { method: "POST" }),
+
+  refreshWatchlist: (watchlistId) =>
+    request(`/screener/watchlists/${watchlistId}/refresh`, { method: "POST" }),
+
+  // ── Symbols ───────────────────────────────────────────────────────────────
   getWatchlistSymbols: (watchlistId) =>
     request(`/screener/watchlists/${watchlistId}/symbols`),
 
-  createRule: (watchlistId, name, buyCondition, sellCondition) =>
-    request(`/watchlists/${watchlistId}/rules`, {
+  addWatchlistSymbol: (watchlistId, symbol) =>
+    request(`/screener/watchlists/${watchlistId}/symbols`, {
+      method: "POST",
+      body: JSON.stringify({ symbol }),
+    }),
+
+  deleteWatchlistSymbol: (watchlistId, symbol) =>
+    request(`/screener/watchlists/${watchlistId}/symbols/${symbol}`, { method: "DELETE" }),
+
+  // ── Alert channels (watchlist-level) ─────────────────────────────────────
+  listAlertChannels: (watchlistId) =>
+    request(`/screener/watchlists/${watchlistId}/alert-channels`),
+
+  addAlertChannel: (watchlistId, channelType, destination) =>
+    request(`/screener/watchlists/${watchlistId}/alert-channels`, {
+      method: "POST",
+      body: JSON.stringify({ channel_type: channelType, destination }),
+    }),
+
+  updateAlertChannel: (watchlistId, channelId, fields) =>
+    request(`/screener/watchlists/${watchlistId}/alert-channels/${channelId}`, {
+      method: "PATCH",
+      body: JSON.stringify(fields),
+    }),
+
+  deleteAlertChannel: (watchlistId, channelId) =>
+    request(`/screener/watchlists/${watchlistId}/alert-channels/${channelId}`, { method: "DELETE" }),
+
+  testAlertChannel: (watchlistId, channelId) =>
+    request(`/screener/watchlists/${watchlistId}/alert-channels/${channelId}/test`, { method: "POST" }),
+
+  // ── Standalone rules ──────────────────────────────────────────────────────
+  listRules: () => request("/rules"),
+
+  createRule: (name, buyCondition, sellCondition) =>
+    request("/rules", {
       method: "POST",
       body: JSON.stringify({ name, buy_condition: buyCondition, sell_condition: sellCondition }),
     }),
 
-  listRules: (watchlistId) => request(`/watchlists/${watchlistId}/rules`),
+  getRule: (ruleId) => request(`/rules/${ruleId}`),
 
-  getRule: (watchlistId, ruleId) => request(`/watchlists/${watchlistId}/rules/${ruleId}`),
-
-  listAlertChannels: (watchlistId, ruleId) =>
-    request(`/watchlists/${watchlistId}/rules/${ruleId}/alert-channels`),
-
-  updateAlertChannel: (watchlistId, ruleId, channelId, channelType, destination) =>
-    request(`/watchlists/${watchlistId}/rules/${ruleId}/alert-channels/${channelId}`, {
+  updateRule: (ruleId, name, buyCondition, sellCondition) =>
+    request(`/rules/${ruleId}`, {
       method: "PATCH",
-      body: JSON.stringify({ channel_type: channelType, destination }),
+      body: JSON.stringify({ name, buy_condition: buyCondition, sell_condition: sellCondition }),
     }),
 
-  testAlertChannel: (watchlistId, ruleId, channelId) =>
-    request(`/watchlists/${watchlistId}/rules/${ruleId}/alert-channels/${channelId}/test`, { method: "POST" }),
+  deleteRule: (ruleId) => request(`/rules/${ruleId}`, { method: "DELETE" }),
 
-  addAlertChannel: (watchlistId, ruleId, channelType, destination) =>
-    request(`/watchlists/${watchlistId}/rules/${ruleId}/alert-channels`, {
-      method: "POST",
-      body: JSON.stringify({ channel_type: channelType, destination }),
-    }),
-
-  deleteSignal: (signalId) =>
-    request(`/signals/${signalId}`, { method: "DELETE" }),
-
+  // ── Signals ───────────────────────────────────────────────────────────────
   listSignals: (ruleId, symbol) => {
     const params = new URLSearchParams();
     if (ruleId) params.append("rule_id", ruleId);
@@ -103,7 +134,12 @@ export const api = {
     return request(`/signals?${params.toString()}`);
   },
 
-  listAllRules: () => request("/signals/rules"),
+  deleteSignal: (signalId) =>
+    request(`/signals/${signalId}`, { method: "DELETE" }),
 
-  getRulePerformance: (ruleId, period = "all") => request(`/signals/rules/${ruleId}/performance?period=${period}`),
+  // ── Analytics ─────────────────────────────────────────────────────────────
+  listAllRules: () => request("/rules"),
+
+  getRulePerformance: (ruleId, period = "all") =>
+    request(`/signals/rules/${ruleId}/performance?period=${period}`),
 };
