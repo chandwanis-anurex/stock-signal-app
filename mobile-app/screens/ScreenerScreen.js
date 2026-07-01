@@ -53,7 +53,9 @@ export default function ScreenerScreen({ navigation }) {
 
   const buildCriteria = () => ({
     exchanges: exchanges.split(",").map(e => e.trim()).filter(Boolean),
-    filters: filters.map(f => ({ ...f, value: isNaN(f.value) ? f.value : Number(f.value) })),
+    filters: filters
+      .filter(f => f.field && f.operator && f.value !== "")
+      .map(f => ({ ...f, value: isNaN(f.value) ? f.value : Number(f.value) })),
     logic: "and",
     limit: 500,
   });
@@ -168,7 +170,7 @@ export default function ScreenerScreen({ navigation }) {
             />
           </View>
         ))}
-        <TouchableOpacity style={styles.addFilterBtn} onPress={() => setFilters([...filters, { field: "RSI", operator: "lt", value: "30" }])}>
+        <TouchableOpacity style={styles.addFilterBtn} onPress={() => setFilters([...filters, { field: "", operator: "", value: "" }])}>
           <Text style={styles.addFilterText}>+ Add Filter</Text>
         </TouchableOpacity>
 
