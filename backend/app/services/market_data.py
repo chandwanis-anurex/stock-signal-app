@@ -22,10 +22,14 @@ class AlpacaProvider(MarketDataProvider):
         self.headers = {"APCA-API-KEY-ID": api_key, "APCA-API-SECRET-KEY": secret_key}
 
     def get_ohlcv(self, symbol: str, lookback_days: int = 60) -> pd.DataFrame:
-        end = pd.Timestamp.utcnow().date() - pd.Timedelta(days=1)
+        end = pd.Timestamp.utcnow().date()
         start = end - pd.Timedelta(days=lookback_days)
         url = f"{self.DATA_URL}/v2/stocks/{symbol}/bars"
-        params = {"start": str(start), "end": str(end), "timeframe": "1Day"}
+        # feed=iex: this account's plan doesn't permit querying recent SIP
+        # data (403 without it) — iex is real-time and what we're entitled
+        # to. Applied to the whole range, not just today, so the series
+        # doesn't mix feeds partway through.
+        params = {"start": str(start), "end": str(end), "timeframe": "1Day", "feed": "iex"}
         resp = httpx.get(url, headers=self.headers, params=params)
         resp.raise_for_status()
         bars = resp.json().get("bars", [])
