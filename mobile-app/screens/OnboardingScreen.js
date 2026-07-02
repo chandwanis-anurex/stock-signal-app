@@ -13,12 +13,12 @@ const STEPS = [
   {
     number: "1",
     icon: "funnel",
-    title: "Screen Stocks",
-    subtitle: "Build Your Watchlist",
+    title: "Build Watchlists",
+    subtitle: "Independent & Reusable",
     description:
-      "Set criteria like Market Cap, Volume, RSI, MACD and more. SignalFlow screens thousands of US stocks automatically and keeps your watchlist fresh on a schedule.",
+      "Create a watchlist by setting screener criteria (Market Cap, Volume, RSI, MACD and more) or by typing symbols in manually. Each watchlist refreshes automatically on a schedule, and you can keep as many as you like — they're managed independently of rules, so you can build one now and attach a rule set whenever you're ready.",
     color: colors.accent,
-    tags: ["Market Cap", "RSI", "Volume", "Price"],
+    tags: ["Screener Criteria", "Manual Symbols", "Auto-Refresh", "Multiple Watchlists"],
   },
   {
     number: "2",
@@ -26,9 +26,9 @@ const STEPS = [
     title: "Define Rules",
     subtitle: "Set Buy & Sell Conditions",
     description:
-      "Create rules using technical indicators — RSI crosses below 30 for a buy, MACD crossover for a sell. Add Take Profit % and Stop Loss % targets per rule.",
+      "Create a rule set using technical indicators — RSI crosses below 30 for a buy, MACD crossover for a sell — then assign it to any watchlist to start generating signals. Add Take Profit % and Stop Loss % targets per rule.",
     color: "#a78bfa",
-    tags: ["RSI", "MACD", "Bollinger Bands", "EMA"],
+    tags: ["RSI", "Stochastic", "Williams %R", "MACD Crossover"],
   },
   {
     number: "3",

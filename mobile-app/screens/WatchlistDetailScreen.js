@@ -6,6 +6,7 @@ import {
 import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import * as Notifications from "expo-notifications";
 import { api } from "../api/client";
 import { colors, typography, layout } from "../theme";
 import Dropdown from "../components/Dropdown";
@@ -15,6 +16,11 @@ const CHANNEL_TYPES = [
   { value: "email",   label: "Email" },
   { value: "sms",     label: "SMS / WhatsApp" },
   { value: "push",    label: "Push Notification" },
+];
+
+const SIZING_TYPES = [
+  { value: "dollars", label: "Dollar Amount ($)" },
+  { value: "shares",  label: "Number of Shares" },
 ];
 
 function RuleToggleButton({ ruleId, ruleName, ruleActive, onToggle, onEdit }) {
@@ -51,6 +57,8 @@ export default function WatchlistDetailScreen({ route, navigation }) {
   // Edit-mode state
   const [editName, setEditName]   = useState("");
   const [editRuleId, setEditRuleId] = useState(null);
+  const [editSizingType, setEditSizingType] = useState("dollars");
+  const [editSizingValue, setEditSizingValue] = useState("1000");
   const [newSymbol, setNewSymbol] = useState("");
   const [saving, setSaving]       = useState(false);
 
@@ -68,6 +76,8 @@ export default function WatchlistDetailScreen({ route, navigation }) {
       setRules(allRules);
       setEditName(wl?.name ?? "");
       setEditRuleId(wl?.rule_id ?? null);
+      setEditSizingType(wl?.position_sizing_type ?? "dollars");
+      setEditSizingValue(String(wl?.position_sizing_value ?? 1000));
       navigation.setOptions({ title: wl?.name ?? "Watchlist" });
     } catch (e) {
       console.warn(e);
@@ -116,9 +126,18 @@ export default function WatchlistDetailScreen({ route, navigation }) {
   };
 
   const handleSaveEdits = async () => {
+    const sizingValue = parseFloat(editSizingValue);
+    if (!sizingValue || sizingValue <= 0) {
+      Alert.alert("Invalid trade size", "Enter a positive number for the trade size.");
+      return;
+    }
     setSaving(true);
     try {
-      const payload = { name: editName.trim() };
+      const payload = {
+        name: editName.trim(),
+        position_sizing_type: editSizingType,
+        position_sizing_value: sizingValue,
+      };
       if (editRuleId !== watchlist.rule_id) {
         payload.rule_id = editRuleId;
       }
@@ -161,10 +180,41 @@ export default function WatchlistDetailScreen({ route, navigation }) {
     Alert.alert("Add Alert Channel", "Choose channel type:", [
       ...CHANNEL_TYPES.map(ct => ({
         text: ct.label,
-        onPress: () => promptDestination(ct.value, ct.label),
+        onPress: () => ct.value === "push" ? registerPushChannel() : promptDestination(ct.value, ct.label),
       })),
       { text: "Cancel", style: "cancel" },
     ]);
+  };
+
+  // Push needs a device token from Apple/Expo, not something a user can type
+  // in — register automatically instead of prompting for one.
+  const registerPushChannel = () => {
+    Alert.alert(
+      "Enable Push Notifications",
+      "SignalFlow will ask for notification permission, then automatically register this device to receive alerts. No code or token to enter.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Continue", onPress: doRegisterPush },
+      ]
+    );
+  };
+
+  const doRegisterPush = async () => {
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission denied", "Enable notifications for SignalFlow in your iPhone's Settings app to use push alerts.");
+        return;
+      }
+      const token = (await Notifications.getExpoPushTokenAsync({
+        projectId: "704b6240-b34b-43ee-a76e-2be8ddade1e9",
+      })).data;
+      const ch = await api.addAlertChannel(watchlistId, "push", token);
+      setChannels(prev => [...prev, ch]);
+      Alert.alert("Push Enabled", "This device will now receive push alerts for this watchlist.");
+    } catch (e) {
+      Alert.alert("Push setup failed", e.message);
+    }
   };
 
   const promptDestination = (channelType, label) => {
@@ -172,7 +222,6 @@ export default function WatchlistDetailScreen({ route, navigation }) {
       webhook: "https://webhooks.traderspost.io/...",
       email:   "your@email.com",
       sms:     "+1234567890",
-      push:    "Device push token",
     };
     Alert.prompt(`Add ${label}`, placeholders[channelType], async (dest) => {
       if (!dest?.trim()) return;
@@ -248,6 +297,16 @@ export default function WatchlistDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
 
+        {/* Trade size summary */}
+        <View style={styles.sizingRow}>
+          <Ionicons name="cash-outline" size={14} color={colors.textSecondary} />
+          <Text style={styles.sizingText}>
+            Buy size: {watchlist.position_sizing_type === "shares"
+              ? `${watchlist.position_sizing_value} shares`
+              : `$${watchlist.position_sizing_value} per trade`}
+          </Text>
+        </View>
+
         {/* Edit toggle */}
         <TouchableOpacity style={styles.editToggleBtn} onPress={() => setEditing(e => !e)}>
           <Ionicons name={editing ? "checkmark" : "create-outline"} size={16} color={colors.accent} />
@@ -273,7 +332,66 @@ export default function WatchlistDetailScreen({ route, navigation }) {
               options={ruleOptions}
               onChange={v => setEditRuleId(v === "__none__" ? null : Number(v))}
             />
+
+            <Text style={styles.sectionLabel}>Trade Size (Buy Orders)</Text>
+            <Text style={styles.sectionHint}>
+              Sent with every buy signal's webhook so the trading platform knows how much to buy. Sell signals close the full position — no size needed.
+            </Text>
+            <Dropdown
+              label="Sizing Method"
+              value={editSizingType}
+              options={SIZING_TYPES}
+              onChange={setEditSizingType}
+            />
+            <TextInput
+              style={styles.input}
+              value={editSizingValue}
+              onChangeText={setEditSizingValue}
+              placeholder={editSizingType === "dollars" ? "e.g. 1000" : "e.g. 10"}
+              placeholderTextColor={colors.textMuted}
+              keyboardType="decimal-pad"
+            />
           </View>
+        )}
+
+        {/* Save button (edit mode) — kept above the symbols list so it's
+            visible without scrolling past a potentially long list */}
+        {editing && (
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdits} disabled={saving}>
+            <Text style={styles.saveBtnText}>{saving ? "Saving..." : "Save Changes"}</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Alert channels */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionLabel}>Alert Channels</Text>
+          <TouchableOpacity onPress={handleAddChannel}>
+            <Text style={styles.addLink}>+ Add</Text>
+          </TouchableOpacity>
+        </View>
+        {channels.length === 0 ? (
+          <Text style={styles.empty}>No alert channels. Signals will appear in-app only.</Text>
+        ) : (
+          channels.map(ch => (
+            <View key={ch.id} style={styles.channelRow}>
+              <Ionicons
+                name={ch.channel_type === "webhook" ? "link" : ch.channel_type === "email" ? "mail" : ch.channel_type === "sms" ? "chatbubble" : "notifications"}
+                size={16} color={colors.accent}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.channelType}>{ch.channel_type}</Text>
+                <Text style={styles.channelDest} numberOfLines={1}>
+                  {ch.channel_type === "push" ? "This device" : ch.destination}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => handleTestChannel(ch.id)} style={styles.testBtn}>
+                <Text style={styles.testBtnText}>Test</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDeleteChannel(ch.id)}>
+                <Ionicons name="trash-outline" size={18} color={colors.sell} />
+              </TouchableOpacity>
+            </View>
+          ))
         )}
 
         {/* Symbols */}
@@ -325,43 +443,6 @@ export default function WatchlistDetailScreen({ route, navigation }) {
             </View>
           ))
         )}
-
-        {/* Alert channels */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionLabel}>Alert Channels</Text>
-          <TouchableOpacity onPress={handleAddChannel}>
-            <Text style={styles.addLink}>+ Add</Text>
-          </TouchableOpacity>
-        </View>
-        {channels.length === 0 ? (
-          <Text style={styles.empty}>No alert channels. Signals will appear in-app only.</Text>
-        ) : (
-          channels.map(ch => (
-            <View key={ch.id} style={styles.channelRow}>
-              <Ionicons
-                name={ch.channel_type === "webhook" ? "link" : ch.channel_type === "email" ? "mail" : ch.channel_type === "sms" ? "chatbubble" : "notifications"}
-                size={16} color={colors.accent}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.channelType}>{ch.channel_type}</Text>
-                <Text style={styles.channelDest} numberOfLines={1}>{ch.destination}</Text>
-              </View>
-              <TouchableOpacity onPress={() => handleTestChannel(ch.id)} style={styles.testBtn}>
-                <Text style={styles.testBtnText}>Test</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDeleteChannel(ch.id)}>
-                <Ionicons name="trash-outline" size={18} color={colors.sell} />
-              </TouchableOpacity>
-            </View>
-          ))
-        )}
-
-        {/* Save button (edit mode) */}
-        {editing && (
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdits} disabled={saving}>
-            <Text style={styles.saveBtnText}>{saving ? "Saving..." : "Save Changes"}</Text>
-          </TouchableOpacity>
-        )}
       </ScrollView>
     </GestureHandlerRootView>
   );
@@ -385,6 +466,8 @@ const styles = StyleSheet.create({
 
   refreshRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
   refreshText: { fontSize: 12, color: colors.accent, fontFamily: "Inter_600SemiBold" },
+  sizingRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  sizingText: { fontSize: 12, color: colors.textSecondary, fontFamily: "Inter_600SemiBold" },
 
   editToggleBtn: {
     flexDirection: "row", alignItems: "center", gap: 6,
@@ -395,6 +478,7 @@ const styles = StyleSheet.create({
 
   editSection: { marginBottom: 8 },
   sectionLabel: { ...typography.label, marginTop: 12, marginBottom: 8 },
+  sectionHint: { ...typography.bodySmall, marginBottom: 8 },
   sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 12, marginBottom: 8 },
   addLink: { color: colors.accent, fontFamily: "Inter_700Bold", fontSize: 14 },
   input: {

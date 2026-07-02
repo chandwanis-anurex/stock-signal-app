@@ -8,19 +8,29 @@ import { api } from "../api/client";
 import { colors, typography, layout } from "../theme";
 import Dropdown from "../components/Dropdown";
 
+// Only bounded/normalized indicators get a plain numeric threshold — a fixed
+// number only makes sense across a whole watchlist if the indicator is
+// already on a 0-100 (or similar) scale regardless of the stock's price.
+// Raw price-level indicators (Close, SMA, EMA, Bollinger Bands) are left out
+// entirely since "Price > 50" doesn't generalize across different stocks.
+// MACD and Volume are still useful, but only as crossovers against their own
+// companion series (Signal Line / Volume SMA) — never a fixed number.
 const INDICATORS = [
-  { value: "RSI",          label: "RSI",                  hasPeriod: true  },
-  { value: "SMA",          label: "SMA",                  hasPeriod: true  },
-  { value: "EMA",          label: "EMA",                  hasPeriod: true  },
-  { value: "MACD",         label: "MACD Line",            hasPeriod: false },
-  { value: "MACD_SIGNAL",  label: "MACD Signal",          hasPeriod: false },
-  { value: "WILLIAMS_R",   label: "Williams %R",          hasPeriod: true  },
-  { value: "ULTIMATE_OSC", label: "Ultimate Oscillator",  hasPeriod: false },
-  { value: "VOLUME",       label: "Volume",               hasPeriod: false },
-  { value: "VOLUME_SMA",   label: "Volume SMA",           hasPeriod: true  },
-  { value: "CLOSE",        label: "Price (Close)",        hasPeriod: false },
-  { value: "BB_UPPER",     label: "Bollinger Band Upper", hasPeriod: true  },
-  { value: "BB_LOWER",     label: "Bollinger Band Lower", hasPeriod: true  },
+  { value: "RSI",          label: "RSI",                 hasPeriod: true,  compareMode: "value" },
+  { value: "WILLIAMS_R",   label: "Williams %R",         hasPeriod: true,  compareMode: "value" },
+  { value: "ULTIMATE_OSC", label: "Ultimate Oscillator", hasPeriod: false, compareMode: "value" },
+  { value: "STOCH_K",      label: "Stochastic %K",       hasPeriod: true,  compareMode: "value" },
+  { value: "STOCH_D",      label: "Stochastic %D",       hasPeriod: true,  compareMode: "value" },
+  {
+    value: "MACD", label: "MACD Line", hasPeriod: false, compareMode: "indicator",
+    compareTarget: "MACD_SIGNAL", compareLabel: "vs. Signal Line",
+    operators: ["crosses_above", "crosses_below"],
+  },
+  {
+    value: "VOLUME", label: "Volume", hasPeriod: false, compareMode: "indicator",
+    compareTarget: "VOLUME_SMA", compareLabel: "vs. 20-Day Avg Volume",
+    operators: ["gt", "gte", "lt", "lte", "crosses_above", "crosses_below"],
+  },
 ];
 const INDICATOR_OPTIONS = INDICATORS.map(i => ({ value: i.value, label: i.label }));
 const OPERATORS = [
@@ -31,6 +41,21 @@ const OPERATORS = [
   { value: "crosses_above", label: "crosses above"           },
   { value: "crosses_below", label: "crosses below"           },
 ];
+
+function operatorsFor(meta) {
+  const allowed = meta?.operators ?? ["gt", "gte", "lt", "lte", "crosses_above", "crosses_below"];
+  return OPERATORS.filter(o => allowed.includes(o.value));
+}
+
+// Sensible defaults when the user switches to a different indicator, so the
+// term never lands on a combination the backend/UI can't represent.
+function defaultsForIndicator(indicatorValue) {
+  const meta = INDICATORS.find(i => i.value === indicatorValue);
+  if (meta?.compareMode === "indicator") {
+    return { operator: meta.operators[0], value: meta.compareTarget };
+  }
+  return { operator: "gt", value: "50" };
+}
 
 function TermCard({ term, index, onChange, onRemove, showRemove, side }) {
   const meta = INDICATORS.find(i => i.value === term.indicator);
@@ -47,7 +72,7 @@ function TermCard({ term, index, onChange, onRemove, showRemove, side }) {
         )}
       </View>
       <Dropdown label="Indicator" value={term.indicator} options={INDICATOR_OPTIONS}
-        onChange={v => onChange({ ...term, indicator: v, params: { period: 14 } })} />
+        onChange={v => onChange({ ...term, indicator: v, params: { period: 14 }, ...defaultsForIndicator(v) })} />
       {meta?.hasPeriod && (
         <>
           <Text style={styles.inputLabel}>Period</Text>
@@ -60,17 +85,25 @@ function TermCard({ term, index, onChange, onRemove, showRemove, side }) {
           />
         </>
       )}
-      <Dropdown label="Condition" value={term.operator} options={OPERATORS}
+      <Dropdown label="Condition" value={term.operator} options={operatorsFor(meta)}
         onChange={v => onChange({ ...term, operator: v })} />
-      <Text style={styles.inputLabel}>Value</Text>
-      <TextInput
-        style={styles.input}
-        value={String(term.value)}
-        onChangeText={v => onChange({ ...term, value: v })}
-        placeholder="e.g. 30"
-        placeholderTextColor={colors.textMuted}
-        keyboardType="decimal-pad"
-      />
+      {meta?.compareMode === "indicator" ? (
+        <View style={styles.compareRow}>
+          <Text style={styles.compareLabel}>{meta.compareLabel}</Text>
+        </View>
+      ) : (
+        <>
+          <Text style={styles.inputLabel}>Value</Text>
+          <TextInput
+            style={styles.input}
+            value={String(term.value)}
+            onChangeText={v => onChange({ ...term, value: v })}
+            placeholder="e.g. 30"
+            placeholderTextColor={colors.textMuted}
+            keyboardType="decimal-pad"
+          />
+        </>
+      )}
     </View>
   );
 }
@@ -156,7 +189,7 @@ export default function RuleBuilderScreen({ route, navigation }) {
             onRemove={() => removeTerm(buyTerms, setBuyTerms, i)} />
         ))}
         <TouchableOpacity style={styles.addBtn}
-          onPress={() => setBuyTerms([...buyTerms, { indicator: "MACD", params: {}, operator: "crosses_above", value: "0" }])}>
+          onPress={() => setBuyTerms([...buyTerms, { indicator: "MACD", params: {}, operator: "crosses_above", value: "MACD_SIGNAL" }])}>
           <Text style={styles.addBtnText}>+ Add Buy Condition</Text>
         </TouchableOpacity>
 
@@ -169,7 +202,7 @@ export default function RuleBuilderScreen({ route, navigation }) {
             onRemove={() => removeTerm(sellTerms, setSellTerms, i)} />
         ))}
         <TouchableOpacity style={styles.addBtn}
-          onPress={() => setSellTerms([...sellTerms, { indicator: "MACD", params: {}, operator: "crosses_below", value: "0" }])}>
+          onPress={() => setSellTerms([...sellTerms, { indicator: "MACD", params: {}, operator: "crosses_below", value: "MACD_SIGNAL" }])}>
           <Text style={styles.addBtnText}>+ Add Sell Condition</Text>
         </TouchableOpacity>
 
@@ -214,6 +247,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
     borderRadius: layout.inputRadius, padding: 14, color: colors.textPrimary, fontSize: 15, marginBottom: 12,
   },
+  compareRow: {
+    backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
+    borderRadius: layout.inputRadius, padding: 14, marginBottom: 12,
+  },
+  compareLabel: { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 14 },
 
   termCard: {
     backgroundColor: colors.card, borderRadius: layout.cardRadius,

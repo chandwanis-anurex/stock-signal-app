@@ -10,6 +10,7 @@ import { auth } from "./api/client";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "./theme";
 import Logo from "./components/Logo";
+import KeyboardDoneBar from "./components/KeyboardDoneBar";
 
 import AuthScreen            from "./screens/AuthScreen";
 import HomeScreen            from "./screens/HomeScreen";
@@ -138,14 +139,11 @@ function MainApp({ onLogout }) {
         tabBarInactiveTintColor: colors.textSecondary,
       }}
     >
+      {/* Home has no tab bar button — reached via the header logo instead */}
       <Tabs.Screen name="Home" component={HomeScreen} options={{
         ...tabOpts("home"),
         title: "SignalFlow",
-      }} />
-
-      <Tabs.Screen name="WatchlistsTab" component={WatchlistsStack} options={{
-        headerShown: false, tabBarLabel: "Watchlists",
-        tabBarIcon: ({ color, size }) => <Ionicons name="list" size={size} color={color} />,
+        tabBarButton: () => null,
       }} />
 
       <Tabs.Screen name="RulesTab" component={RulesStack} options={{
@@ -153,8 +151,24 @@ function MainApp({ onLogout }) {
         tabBarIcon: ({ color, size }) => <Ionicons name="git-branch" size={size} color={color} />,
       }} />
 
+      <Tabs.Screen name="WatchlistsTab" component={WatchlistsStack} options={{
+        headerShown: false, tabBarLabel: "Watchlists",
+        tabBarIcon: ({ color, size }) => <Ionicons name="list" size={size} color={color} />,
+      }}
+        listeners={({ navigation }) => ({
+          // Screens like Home's "Screen Stocks" tile jump straight into this
+          // stack's Screener screen, so tapping the tab button should always
+          // return to the Watchlists list, not wherever the stack was left.
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate("WatchlistsTab", { screen: "Watchlists" });
+          },
+        })}
+      />
+
       <Tabs.Screen name="Signals" component={SignalFeedScreen} options={{
         ...tabOpts("flash"), title: "Trade Signals",
+        tabBarIcon: ({ color, size }) => <Ionicons name="flash" size={size + 6} color={color} />,
       }} />
 
       <Tabs.Screen name="Analytics" component={AnalyticsScreen} options={{
@@ -194,7 +208,12 @@ export default function App() {
   }
 
   if (!authenticated) {
-    return <AuthScreen onAuthenticated={() => setAuthenticated(true)} />;
+    return (
+      <>
+        <AuthScreen onAuthenticated={() => setAuthenticated(true)} />
+        <KeyboardDoneBar />
+      </>
+    );
   }
 
   if (!onboarded) {
@@ -202,9 +221,12 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer theme={navTheme}>
-      <MainApp onLogout={() => { setAuthenticated(false); setOnboarded(false); }} />
-    </NavigationContainer>
+    <>
+      <NavigationContainer theme={navTheme}>
+        <MainApp onLogout={() => { setAuthenticated(false); setOnboarded(false); }} />
+      </NavigationContainer>
+      <KeyboardDoneBar />
+    </>
   );
 }
 

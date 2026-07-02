@@ -20,7 +20,12 @@
         ],
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Not used",
-        "NSMicrophoneUsageDescription": "Not used"
+        "NSMicrophoneUsageDescription": "Not used",
+        "NSLocalNetworkUsageDescription": "SignalFlow uses your local network to connect to the development server while testing.",
+        "NSBonjourServices": [
+          "_dev._tcp",
+          "_expo._tcp"
+        ]
       }
     },
     "plugins": [

@@ -52,6 +52,14 @@ def _bollinger(series: pd.Series, period: int = 20):
     return mid + 2 * std, mid - 2 * std
 
 
+def _stochastic(df: pd.DataFrame, k_period: int = 14, d_period: int = 3):
+    low_min = df["low"].rolling(k_period).min()
+    high_max = df["high"].rolling(k_period).max()
+    percent_k = 100 * (df["close"] - low_min) / (high_max - low_min)
+    percent_d = percent_k.rolling(d_period).mean()
+    return percent_k, percent_d
+
+
 def _compute_indicator(df: pd.DataFrame, term: IndicatorTerm) -> pd.Series:
     name = term.indicator.upper()
     params = term.params or {}
@@ -84,6 +92,12 @@ def _compute_indicator(df: pd.DataFrame, term: IndicatorTerm) -> pd.Series:
     elif name == "BB_LOWER":
         _, lower = _bollinger(df["close"], period=params.get("period", 20))
         return lower
+    elif name == "STOCH_K":
+        k, _ = _stochastic(df, k_period=params.get("period", 14))
+        return k
+    elif name == "STOCH_D":
+        _, d = _stochastic(df, k_period=params.get("period", 14))
+        return d
     else:
         raise ValueError(f"Unsupported indicator: {term.indicator}")
 
@@ -93,24 +107,28 @@ def _evaluate_term(df: pd.DataFrame, term: IndicatorTerm) -> bool:
     latest = series.iloc[-1]
     prev = series.iloc[-2] if len(series) > 1 else latest
 
-    target = term.value
-    if isinstance(target, str):
-        # value references another computed series name isn't supported in this
-        # minimal engine yet; treat as a literal float for now.
-        target = float(target)
+    if isinstance(term.value, str):
+        # value names another indicator (e.g. MACD vs MACD_SIGNAL, VOLUME vs
+        # VOLUME_SMA) — compare the two series directly instead of a literal.
+        target_term = IndicatorTerm(indicator=term.value, params={}, operator=term.operator, value=0)
+        target_series = _compute_indicator(df, target_term)
+        target_latest = target_series.iloc[-1]
+        target_prev = target_series.iloc[-2] if len(target_series) > 1 else target_latest
+    else:
+        target_latest = target_prev = term.value
 
     if term.operator == "gt":
-        return latest > target
+        return latest > target_latest
     elif term.operator == "gte":
-        return latest >= target
+        return latest >= target_latest
     elif term.operator == "lt":
-        return latest < target
+        return latest < target_latest
     elif term.operator == "lte":
-        return latest <= target
+        return latest <= target_latest
     elif term.operator == "crosses_above":
-        return prev <= target < latest
+        return prev <= target_prev and latest > target_latest
     elif term.operator == "crosses_below":
-        return prev >= target > latest
+        return prev >= target_prev and latest < target_latest
     else:
         raise ValueError(f"Unsupported operator: {term.operator}")
 

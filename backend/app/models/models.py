@@ -35,6 +35,9 @@ class Watchlist(Base):
     # Rule assigned to this watchlist (one rule per watchlist)
     rule_id = Column(Integer, ForeignKey("rules.id"), nullable=True)
     rule_active = Column(Boolean, default=False)
+    # Trade sizing used to build the webhook order payload on buy signals
+    position_sizing_type = Column(String, default="dollars")   # "dollars" | "shares"
+    position_sizing_value = Column(Float, default=1000.0)
 
     user = relationship("User", back_populates="watchlists")
     symbols = relationship("WatchlistSymbol", back_populates="watchlist", cascade="all, delete-orphan")

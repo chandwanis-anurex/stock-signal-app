@@ -51,7 +51,24 @@ def send_push(device_token: str, title: str, message: str):
     )
 
 
-def send_webhook(url: str, signal: Signal):
+def _buy_quantity(watchlist, price: float):
+    """
+    Converts a watchlist's position sizing setting into a share quantity for
+    the order. Sell signals close the existing position instead, so no size
+    is needed there. Falls back to None (quantity omitted) if sizing isn't
+    configured or price is unusable, rather than sending a bogus 0.
+    """
+    if watchlist is None or not price:
+        return None
+    if watchlist.position_sizing_type == "shares":
+        return watchlist.position_sizing_value
+    dollars = watchlist.position_sizing_value or 0
+    return int(dollars / price) or None
+
+
+def send_webhook(url: str, signal: Signal, watchlist=None):
+    quantity = _buy_quantity(watchlist, signal.price_at_signal) if signal.side == "buy" else None
+
     if "traderspost" in url.lower():
         payload = {
             "ticker": signal.symbol,
@@ -59,6 +76,8 @@ def send_webhook(url: str, signal: Signal):
             "price": signal.price_at_signal,
             "sentiment": "bullish" if signal.side == "buy" else "bearish",
         }
+        if quantity is not None:
+            payload["quantity"] = quantity
     else:
         payload = {
             "symbol": signal.symbol,
@@ -67,6 +86,8 @@ def send_webhook(url: str, signal: Signal):
             "fired_at": signal.fired_at.isoformat(),
             "indicator_snapshot": signal.indicator_snapshot,
         }
+        if quantity is not None:
+            payload["quantity"] = quantity
 
     response = httpx.post(url, json=payload, timeout=10)
     response.raise_for_status()
@@ -82,6 +103,6 @@ def dispatch(channel: AlertChannel, signal: Signal):
     elif channel.channel_type == "push":
         send_push(channel.destination, title="New trading signal", message=message)
     elif channel.channel_type == "webhook":
-        send_webhook(channel.destination, signal)
+        send_webhook(channel.destination, signal, channel.watchlist)
     else:
         raise ValueError(f"Unsupported channel type: {channel.channel_type}")

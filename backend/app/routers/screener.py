@@ -117,6 +117,16 @@ def update_watchlist(watchlist_id: int, payload: dict, db: Session = Depends(get
                 raise HTTPException(status_code=404, detail="Rule not found")
         wl.rule_id = rule_id
         wl.rule_active = False  # always stop when changing rule
+    if "position_sizing_type" in payload:
+        sizing_type = payload["position_sizing_type"]
+        if sizing_type not in ("dollars", "shares"):
+            raise HTTPException(status_code=400, detail="position_sizing_type must be 'dollars' or 'shares'")
+        wl.position_sizing_type = sizing_type
+    if "position_sizing_value" in payload:
+        sizing_value = payload["position_sizing_value"]
+        if not isinstance(sizing_value, (int, float)) or sizing_value <= 0:
+            raise HTTPException(status_code=400, detail="position_sizing_value must be a positive number")
+        wl.position_sizing_value = sizing_value
     db.commit()
     return _wl_summary(wl, db)
 
@@ -322,6 +332,8 @@ def _wl_summary(wl: Watchlist, db: Session) -> dict:
         "rule_id": wl.rule_id,
         "rule_active": wl.rule_active,
         "rule_name": rule_name,
+        "position_sizing_type": wl.position_sizing_type,
+        "position_sizing_value": wl.position_sizing_value,
     }
 
 

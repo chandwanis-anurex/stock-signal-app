@@ -31,6 +31,9 @@ def _run_migrations():
         conn.execute(text("ALTER TABLE watchlist_symbols ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE alert_channels ADD COLUMN IF NOT EXISTS watchlist_id INTEGER REFERENCES watchlists(id)"))
         conn.execute(text("ALTER TABLE alert_channels ALTER COLUMN rule_id DROP NOT NULL"))
+        # Phase 3 — position sizing for webhook trade orders
+        conn.execute(text("ALTER TABLE watchlists ADD COLUMN IF NOT EXISTS position_sizing_type VARCHAR DEFAULT 'dollars'"))
+        conn.execute(text("ALTER TABLE watchlists ADD COLUMN IF NOT EXISTS position_sizing_value FLOAT DEFAULT 1000.0"))
         # Data migration: propagate user_id to existing rules
         conn.execute(text("""
             UPDATE rules SET user_id = watchlists.user_id
