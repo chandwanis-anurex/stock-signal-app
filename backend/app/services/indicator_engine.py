@@ -11,7 +11,6 @@ from typing import Dict
 import pandas as pd
 
 from app.schemas import ConditionGroup, IndicatorTerm
-from app.services.market_data import MarketDataProvider
 
 
 def _rsi(series: pd.Series, period: int = 14) -> pd.Series:
@@ -148,14 +147,15 @@ def evaluate_condition(df: pd.DataFrame, condition: ConditionGroup) -> bool:
 
 
 def evaluate_symbol(
-    provider: MarketDataProvider,
-    symbol: str,
+    df: pd.DataFrame,
     buy_condition: ConditionGroup,
     sell_condition: ConditionGroup,
 ) -> Dict:
-    """Returns {"buy": bool, "sell": bool, "price": float, "snapshot": dict}."""
-    df = provider.get_ohlcv(symbol, lookback_days=90)
-    if df.empty or len(df) < 5:
+    """Evaluates conditions against a symbol's OHLCV frame (fetched by the
+    caller, typically in one batched request for a whole watchlist).
+
+    Returns {"buy": bool, "sell": bool, "price": float, "snapshot": dict}."""
+    if df is None or df.empty or len(df) < 5:
         return {"buy": False, "sell": False, "price": None, "snapshot": {}}
 
     buy_triggered = evaluate_condition(df, buy_condition) if buy_condition else False

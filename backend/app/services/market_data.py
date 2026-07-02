@@ -1,4 +1,6 @@
 import os
+import time
+
 import httpx
 import pandas as pd
 
@@ -6,6 +8,15 @@ import pandas as pd
 class MarketDataProvider:
     def get_ohlcv(self, symbol: str, lookback_days: int = 60) -> pd.DataFrame:
         raise NotImplementedError
+
+    def get_ohlcv_batch(self, symbols: list[str], lookback_days: int = 60) -> dict[str, pd.DataFrame]:
+        out = {}
+        for sym in symbols:
+            try:
+                out[sym] = self.get_ohlcv(sym, lookback_days)
+            except Exception:
+                continue
+        return out
 
     def get_latest_price(self, symbol: str) -> float:
         raise NotImplementedError
@@ -30,24 +41,63 @@ class AlpacaProvider(MarketDataProvider):
     def __init__(self, api_key: str, secret_key: str):
         self.headers = {"APCA-API-KEY-ID": api_key, "APCA-API-SECRET-KEY": secret_key}
 
+    def _get(self, url: str, params: dict, timeout: float = 10) -> httpx.Response:
+        # The free plan is capped at 200 req/min; when a burst exhausts the
+        # window, wait for the reset once (capped so an interactive request
+        # can't hang the mobile app) rather than failing outright.
+        resp = httpx.get(url, headers=self.headers, params=params, timeout=timeout)
+        if resp.status_code == 429:
+            reset = resp.headers.get("x-ratelimit-reset")
+            wait = min(max(int(reset) - time.time() + 0.5, 1), 10) if reset else 3
+            time.sleep(wait)
+            resp = httpx.get(url, headers=self.headers, params=params, timeout=timeout)
+        resp.raise_for_status()
+        return resp
+
     def get_ohlcv(self, symbol: str, lookback_days: int = 60) -> pd.DataFrame:
+        return self.get_ohlcv_batch([symbol], lookback_days).get(symbol, pd.DataFrame())
+
+    # One request covers up to _BARS_CHUNK symbols (vs one request per symbol),
+    # which is what keeps the scheduler far below the free plan's 200 req/min.
+    _BARS_CHUNK = 200
+
+    def get_ohlcv_batch(self, symbols: list[str], lookback_days: int = 60) -> dict[str, pd.DataFrame]:
         end = pd.Timestamp.utcnow().date()
         start = end - pd.Timedelta(days=lookback_days)
-        url = f"{self.DATA_URL}/v2/stocks/{symbol}/bars"
-        # feed=iex: this account's plan doesn't permit querying recent SIP
-        # data (403 without it) — iex is real-time and what we're entitled
-        # to. Applied to the whole range, not just today, so the series
-        # doesn't mix feeds partway through.
-        params = {"start": str(start), "end": str(end), "timeframe": "1Day", "feed": "iex"}
-        resp = httpx.get(url, headers=self.headers, params=params)
-        resp.raise_for_status()
-        bars = resp.json().get("bars", [])
-        df = pd.DataFrame(bars)
-        if df.empty:
-            return df
-        df["date"] = pd.to_datetime(df["t"])
-        df = df.rename(columns={"o": "open", "h": "high", "l": "low", "c": "close", "v": "volume"})
-        return df.set_index("date")[["open", "high", "low", "close", "volume"]]
+        out: dict[str, pd.DataFrame] = {}
+
+        for i in range(0, len(symbols), self._BARS_CHUNK):
+            chunk = symbols[i:i + self._BARS_CHUNK]
+            bars_by_symbol: dict[str, list] = {}
+            # feed=iex: this account's plan doesn't permit querying recent SIP
+            # data (403 without it) — iex is real-time and what we're entitled
+            # to. Applied to the whole range, not just today, so the series
+            # doesn't mix feeds partway through.
+            params = {
+                "symbols": ",".join(chunk),
+                "start": str(start), "end": str(end),
+                "timeframe": "1Day", "feed": "iex", "limit": 10000,
+            }
+            while True:
+                resp = self._get(f"{self.DATA_URL}/v2/stocks/bars", params, timeout=30)
+                payload = resp.json()
+                for sym, bars in (payload.get("bars") or {}).items():
+                    bars_by_symbol.setdefault(sym, []).extend(bars)
+                token = payload.get("next_page_token")
+                if not token:
+                    break
+                params["page_token"] = token
+
+            for sym, bars in bars_by_symbol.items():
+                df = pd.DataFrame(bars)
+                if df.empty:
+                    out[sym] = df
+                    continue
+                df["date"] = pd.to_datetime(df["t"])
+                df = df.rename(columns={"o": "open", "h": "high", "l": "low", "c": "close", "v": "volume"})
+                out[sym] = df.set_index("date")[["open", "high", "low", "close", "volume"]]
+
+        return out
 
     def get_latest_price(self, symbol: str) -> float:
         prices = self.get_latest_prices([symbol])
@@ -75,8 +125,7 @@ class AlpacaProvider(MarketDataProvider):
     def _snapshot_prices(self, symbols: list[str], feed: str) -> dict[str, tuple[float, pd.Timestamp]]:
         url = f"{self.DATA_URL}/v2/stocks/snapshots"
         params = {"symbols": ",".join(symbols), "feed": feed}
-        resp = httpx.get(url, headers=self.headers, params=params, timeout=10)
-        resp.raise_for_status()
+        resp = self._get(url, params)
         out = {}
         for sym, snap in resp.json().items():
             if not isinstance(snap, dict):

@@ -67,19 +67,34 @@ def evaluate_rules():
             Watchlist.rule_active == True,  # noqa: E712
         ).all()
 
+        # Fetch OHLCV for every symbol across all active watchlists in one
+        # batched request — per-symbol fetches were the main consumer of the
+        # free plan's 200 req/min budget.
+        plans = []
+        all_symbols = set()
         for wl in watchlists:
             rule = db.query(Rule).filter(Rule.id == wl.rule_id).first()
             if not rule:
                 continue
+            symbols = [ws.symbol for ws in db.query(WatchlistSymbol).filter(
+                WatchlistSymbol.watchlist_id == wl.id).all()]
+            plans.append((wl, rule, symbols))
+            all_symbols.update(symbols)
 
-            symbols = db.query(WatchlistSymbol).filter(WatchlistSymbol.watchlist_id == wl.id).all()
+        if not all_symbols:
+            return
+        try:
+            ohlcv = provider.get_ohlcv_batch(sorted(all_symbols), lookback_days=90)
+        except Exception:
+            return
+
+        for wl, rule, symbols in plans:
             buy_cond = ConditionGroup(**rule.buy_condition) if rule.buy_condition else None
             sell_cond = ConditionGroup(**rule.sell_condition) if rule.sell_condition else None
 
-            for ws in symbols:
-                symbol = ws.symbol
+            for symbol in symbols:
                 try:
-                    result = evaluate_symbol(provider, symbol, buy_cond, sell_cond)
+                    result = evaluate_symbol(ohlcv.get(symbol), buy_cond, sell_cond)
                 except Exception:
                     continue
 

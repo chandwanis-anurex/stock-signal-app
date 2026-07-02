@@ -37,24 +37,28 @@ def record_checkpoint(db: Session, signal: Signal, checkpoint: str, current_pric
 def update_due_checkpoints(db: Session):
     provider = get_provider()
     signals = db.query(Signal).all()
+    if not signals:
+        return
+
+    # One batched price fetch for all signals instead of one request per
+    # signal — this job used to burst 2×N calls against the 200 req/min cap.
+    try:
+        prices = provider.get_latest_prices(sorted({s.symbol for s in signals}))
+    except Exception:
+        return
 
     for signal in signals:
+        price = prices.get(signal.symbol)
+        if price is None:
+            continue
         existing = {p.checkpoint for p in signal.performance}
         for label, window in CHECKPOINTS.items():
             if label in existing:
                 continue
             if datetime.utcnow() >= signal.fired_at + window:
-                try:
-                    price = provider.get_latest_price(signal.symbol)
-                    record_checkpoint(db, signal, label, price)
-                except Exception:
-                    continue
+                record_checkpoint(db, signal, label, price)
 
-        try:
-            price = provider.get_latest_price(signal.symbol)
-            record_checkpoint(db, signal, "current", price)
-        except Exception:
-            continue
+        record_checkpoint(db, signal, "current", price)
 
 
 def rule_performance_summary(db: Session, rule_id: int, period: str = "all") -> dict:
