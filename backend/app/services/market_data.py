@@ -37,8 +37,13 @@ class AlpacaProvider(MarketDataProvider):
         return df.set_index("date")[["open", "high", "low", "close", "volume"]]
 
     def get_latest_price(self, symbol: str) -> float:
-        df = self.get_ohlcv(symbol, lookback_days=2)
-        return float(df["close"].iloc[-1])
+        # get_ohlcv only ever returns completed daily bars (deliberately
+        # excludes today), so it's always at least a day stale for "current
+        # price" purposes. Use the real-time last-trade endpoint instead.
+        url = f"{self.DATA_URL}/v2/stocks/{symbol}/trades/latest"
+        resp = httpx.get(url, headers=self.headers, timeout=10)
+        resp.raise_for_status()
+        return float(resp.json()["trade"]["p"])
 
     def get_company_name(self, symbol: str) -> str:
         try:
