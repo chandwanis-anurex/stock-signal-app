@@ -3,12 +3,12 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.database import SessionLocal
-from app.models.models import AlertChannel, Watchlist, Rule, WatchlistSymbol, Signal
+from app.models.models import Watchlist, Rule, WatchlistSymbol
 from app.schemas import ScreenerCriteria, ConditionGroup
 from app.services.screener_service import run_screener
 from app.services.indicator_engine import evaluate_symbol
 from app.services.market_data import get_provider
-from app.services.alert_dispatcher import dispatch
+from app.services.signal_service import find_open_buy, fire_signal
 from app.services.analytics_service import update_due_checkpoints
 
 
@@ -75,7 +75,6 @@ def evaluate_rules():
             symbols = db.query(WatchlistSymbol).filter(WatchlistSymbol.watchlist_id == wl.id).all()
             buy_cond = ConditionGroup(**rule.buy_condition) if rule.buy_condition else None
             sell_cond = ConditionGroup(**rule.sell_condition) if rule.sell_condition else None
-            state = rule.last_state or {}
 
             for ws in symbols:
                 symbol = ws.symbol
@@ -84,44 +83,18 @@ def evaluate_rules():
                 except Exception:
                     continue
 
-                prev = state.get(symbol, {"buy": False, "sell": False})
+                # Position-existence gating replaces the old edge-latch: a
+                # buy only fires if none is already open, and a sell only
+                # fires if one is — this is itself the dedupe (no separate
+                # per-symbol state to track or get stuck).
+                open_buy = find_open_buy(db, wl.id, symbol)
 
-                if result["buy"] and not prev["buy"]:
-                    _fire_signal(db, rule, wl, symbol, "buy", result)
-                if result["sell"] and not prev["sell"]:
-                    _fire_signal(db, rule, wl, symbol, "sell", result)
-
-                state[symbol] = {"buy": result["buy"], "sell": result["sell"]}
-
-            rule.last_state = state
-            db.commit()
+                if result["buy"] and not open_buy:
+                    fire_signal(db, rule.id, wl.id, symbol, "buy", result["price"], result["snapshot"])
+                if result["sell"] and open_buy:
+                    fire_signal(db, rule.id, wl.id, symbol, "sell", result["price"], result["snapshot"], closes=open_buy)
     finally:
         db.close()
-
-
-def _fire_signal(db, rule: Rule, watchlist: Watchlist, symbol: str, side: str, result: dict):
-    signal = Signal(
-        rule_id=rule.id,
-        symbol=symbol,
-        side=side,
-        price_at_signal=result["price"],
-        indicator_snapshot=result["snapshot"],
-    )
-    db.add(signal)
-    db.commit()
-    db.refresh(signal)
-
-    # Use watchlist-level alert channels (new model)
-    channels = db.query(AlertChannel).filter(
-        AlertChannel.watchlist_id == watchlist.id,
-        AlertChannel.active == True,  # noqa: E712
-    ).all()
-
-    for channel in channels:
-        try:
-            dispatch(channel, signal)
-        except Exception:
-            continue
 
 
 def run_analytics_update():

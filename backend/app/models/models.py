@@ -105,14 +105,24 @@ class Signal(Base):
 
     id = Column(Integer, primary_key=True)
     rule_id = Column(Integer, ForeignKey("rules.id"))
+    watchlist_id = Column(Integer, ForeignKey("watchlists.id"), nullable=True)
     symbol = Column(String, nullable=False)
     side = Column(String, nullable=False)  # buy | sell
     price_at_signal = Column(Float, nullable=False)
     indicator_snapshot = Column(JSON, nullable=True)
     fired_at = Column(DateTime, default=datetime.utcnow)
+    is_manual = Column(Boolean, default=False)
+    # Buy/sell position pairing: closed_at is set only on buy rows (when the
+    # position closes); closes_signal_id is set only on sell rows (which buy
+    # it closed). ON DELETE SET NULL so deleting either side of a pair never
+    # hits a raw FK violation.
+    closed_at = Column(DateTime, nullable=True)
+    closes_signal_id = Column(Integer, ForeignKey("signals.id", ondelete="SET NULL"), nullable=True)
 
     rule = relationship("Rule", back_populates="signals")
     performance = relationship("SignalPerformance", back_populates="signal", cascade="all, delete-orphan")
+    watchlist = relationship("Watchlist")
+    closes = relationship("Signal", remote_side=[id], foreign_keys=[closes_signal_id])
 
 
 class SignalPerformance(Base):

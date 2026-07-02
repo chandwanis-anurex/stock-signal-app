@@ -55,6 +55,11 @@ def _run_migrations():
             UPDATE alert_channels SET watchlist_id = rules.watchlist_id
             FROM rules WHERE rules.id = alert_channels.rule_id AND alert_channels.watchlist_id IS NULL
         """))
+        # Phase 4 — buy/sell position pairing
+        conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS watchlist_id INTEGER REFERENCES watchlists(id)"))
+        conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP"))
+        conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS closes_signal_id INTEGER REFERENCES signals(id) ON DELETE SET NULL"))
         conn.commit()
 
 
