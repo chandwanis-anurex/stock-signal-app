@@ -1,3 +1,5 @@
+from datetime import timezone
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -68,7 +70,7 @@ def list_signals(
             "company_name": company_map.get(s.symbol, ""),
             "side": s.side,
             "price_at_signal": s.price_at_signal,
-            "fired_at": s.fired_at,
+            "fired_at": s.fired_at.replace(tzinfo=timezone.utc).isoformat(),
             "rule_name": rules.get(s.rule_id, ""),
         }
         for s in signals

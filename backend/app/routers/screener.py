@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -327,7 +327,7 @@ def _wl_summary(wl: Watchlist, db: Session) -> dict:
     return {
         "id": wl.id,
         "name": wl.name,
-        "last_run_at": wl.last_run_at,
+        "last_run_at": wl.last_run_at.replace(tzinfo=timezone.utc).isoformat() if wl.last_run_at else None,
         "screener_criteria": wl.screener_criteria,
         "rule_id": wl.rule_id,
         "rule_active": wl.rule_active,
