@@ -1,13 +1,17 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   TextInput, Alert, RefreshControl, ActivityIndicator,
 } from "react-native";
 import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
-import { api } from "../api/client";
+import {
+  useWatchlistDetailQuery, useWatchlistSymbolsQuery, useWatchlistChannelsQuery, useRulesQuery,
+  useUpdateWatchlistMutation, useToggleWatchlistRuleMutation, useRefreshWatchlistMutation,
+  useAddWatchlistSymbolMutation, useDeleteWatchlistSymbolMutation,
+  useAddAlertChannelMutation, useDeleteAlertChannelMutation, useTestAlertChannelMutation,
+} from "../api/queries";
 import { colors, typography, layout } from "../theme";
 import Dropdown from "../components/Dropdown";
 
@@ -47,10 +51,25 @@ function RuleToggleButton({ ruleId, ruleName, ruleActive, onToggle, onEdit }) {
 export default function WatchlistDetailScreen({ route, navigation }) {
   const { watchlistId } = route.params;
 
-  const [watchlist, setWatchlist]   = useState(null);
-  const [symbols, setSymbols]       = useState([]);
-  const [channels, setChannels]     = useState([]);
-  const [rules, setRules]           = useState([]);
+  const wlQuery       = useWatchlistDetailQuery(watchlistId);
+  const symbolsQuery   = useWatchlistSymbolsQuery(watchlistId);
+  const channelsQuery  = useWatchlistChannelsQuery(watchlistId);
+  const rulesQuery     = useRulesQuery();
+
+  const watchlist = wlQuery.data;
+  const symbols   = symbolsQuery.data ?? [];
+  const channels  = channelsQuery.data ?? [];
+  const rules     = rulesQuery.data ?? [];
+
+  const updateMutation       = useUpdateWatchlistMutation(watchlistId);
+  const toggleMutation       = useToggleWatchlistRuleMutation(watchlistId);
+  const refreshMutation      = useRefreshWatchlistMutation(watchlistId);
+  const addSymbolMutation    = useAddWatchlistSymbolMutation(watchlistId);
+  const deleteSymbolMutation = useDeleteWatchlistSymbolMutation(watchlistId);
+  const addChannelMutation   = useAddAlertChannelMutation(watchlistId);
+  const deleteChannelMutation = useDeleteAlertChannelMutation(watchlistId);
+  const testChannelMutation  = useTestAlertChannelMutation(watchlistId);
+
   const [editing, setEditing]       = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -60,33 +79,24 @@ export default function WatchlistDetailScreen({ route, navigation }) {
   const [editSizingType, setEditSizingType] = useState("dollars");
   const [editSizingValue, setEditSizingValue] = useState("1000");
   const [newSymbol, setNewSymbol] = useState("");
-  const [saving, setSaving]       = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const [wl, syms, chs, allRules] = await Promise.all([
-        api.listWatchlists().then(list => list.find(w => w.id === watchlistId)),
-        api.getWatchlistSymbols(watchlistId),
-        api.listAlertChannels(watchlistId),
-        api.listRules(),
-      ]);
-      setWatchlist(wl);
-      setSymbols(syms);
-      setChannels(chs);
-      setRules(allRules);
-      setEditName(wl?.name ?? "");
-      setEditRuleId(wl?.rule_id ?? null);
-      setEditSizingType(wl?.position_sizing_type ?? "dollars");
-      setEditSizingValue(String(wl?.position_sizing_value ?? 1000));
-      navigation.setOptions({ title: wl?.name ?? "Watchlist" });
-    } catch (e) {
-      console.warn(e);
-    }
-  }, [watchlistId]);
+  useEffect(() => {
+    navigation.setOptions({ title: watchlist?.name ?? "Watchlist" });
+  }, [watchlist?.name]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const startEditing = () => {
+    setEditName(watchlist?.name ?? "");
+    setEditRuleId(watchlist?.rule_id ?? null);
+    setEditSizingType(watchlist?.position_sizing_type ?? "dollars");
+    setEditSizingValue(String(watchlist?.position_sizing_value ?? 1000));
+    setEditing(true);
+  };
 
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([wlQuery.refetch(), symbolsQuery.refetch(), channelsQuery.refetch(), rulesQuery.refetch()]);
+    setRefreshing(false);
+  };
 
   const handleToggle = () => {
     const msg = watchlist.rule_active
@@ -97,13 +107,8 @@ export default function WatchlistDetailScreen({ route, navigation }) {
       msg,
       [
         { text: "Cancel", style: "cancel" },
-        { text: watchlist.rule_active ? "Halt" : "Start", onPress: async () => {
-          try {
-            const res = await api.toggleWatchlistRule(watchlistId);
-            setWatchlist(prev => ({ ...prev, rule_active: res.rule_active }));
-          } catch (e) {
-            Alert.alert("Error", e.message);
-          }
+        { text: watchlist.rule_active ? "Halt" : "Start", onPress: () => {
+          toggleMutation.mutate(undefined, { onError: (e) => Alert.alert("Error", e.message) });
         }},
       ]
     );
@@ -112,67 +117,46 @@ export default function WatchlistDetailScreen({ route, navigation }) {
   const handleRefreshScreener = () => {
     Alert.alert("Refresh Watchlist", "Re-run screener criteria and update symbols? Manually added symbols will be kept.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Refresh", onPress: async () => {
-        try {
-          await api.refreshWatchlist(watchlistId);
-          const syms = await api.getWatchlistSymbols(watchlistId);
-          setSymbols(syms);
-          Alert.alert("Done", "Watchlist refreshed.");
-        } catch (e) {
-          Alert.alert("Error", e.message);
-        }
+      { text: "Refresh", onPress: () => {
+        refreshMutation.mutate(undefined, {
+          onSuccess: () => Alert.alert("Done", "Watchlist refreshed."),
+          onError: (e) => Alert.alert("Error", e.message),
+        });
       }},
     ]);
   };
 
-  const handleSaveEdits = async () => {
+  const handleSaveEdits = () => {
     const sizingValue = parseFloat(editSizingValue);
     if (!sizingValue || sizingValue <= 0) {
       Alert.alert("Invalid trade size", "Enter a positive number for the trade size.");
       return;
     }
-    setSaving(true);
-    try {
-      const payload = {
-        name: editName.trim(),
-        position_sizing_type: editSizingType,
-        position_sizing_value: sizingValue,
-      };
-      if (editRuleId !== watchlist.rule_id) {
-        payload.rule_id = editRuleId;
-      }
-      const updated = await api.updateWatchlist(watchlistId, payload);
-      setWatchlist(prev => ({ ...prev, ...updated }));
-      navigation.setOptions({ title: updated.name ?? editName.trim() });
-      setEditing(false);
-    } catch (e) {
-      Alert.alert("Save failed", e.message);
-    } finally {
-      setSaving(false);
+    const payload = {
+      name: editName.trim(),
+      position_sizing_type: editSizingType,
+      position_sizing_value: sizingValue,
+    };
+    if (editRuleId !== watchlist.rule_id) {
+      payload.rule_id = editRuleId;
     }
+    updateMutation.mutate(payload, {
+      onSuccess: () => setEditing(false),
+      onError: (e) => Alert.alert("Save failed", e.message),
+    });
   };
 
-  const handleAddSymbol = async () => {
+  const handleAddSymbol = () => {
     const sym = newSymbol.trim().toUpperCase();
     if (!sym) return;
-    try {
-      const result = await api.addWatchlistSymbol(watchlistId, sym);
-      if (!result.already_exists) {
-        setSymbols(prev => [...prev, { symbol: result.symbol, company_name: result.company_name, is_manual: true }]);
-      }
-      setNewSymbol("");
-    } catch (e) {
-      Alert.alert("Error", e.message);
-    }
+    addSymbolMutation.mutate(sym, {
+      onSuccess: () => setNewSymbol(""),
+      onError: (e) => Alert.alert("Error", e.message),
+    });
   };
 
-  const handleDeleteSymbol = async (symbol) => {
-    try {
-      await api.deleteWatchlistSymbol(watchlistId, symbol);
-      setSymbols(prev => prev.filter(s => s.symbol !== symbol));
-    } catch (e) {
-      Alert.alert("Error", e.message);
-    }
+  const handleDeleteSymbol = (symbol) => {
+    deleteSymbolMutation.mutate(symbol, { onError: (e) => Alert.alert("Error", e.message) });
   };
 
   // Alert channels
@@ -209,8 +193,7 @@ export default function WatchlistDetailScreen({ route, navigation }) {
       const token = (await Notifications.getExpoPushTokenAsync({
         projectId: "704b6240-b34b-43ee-a76e-2be8ddade1e9",
       })).data;
-      const ch = await api.addAlertChannel(watchlistId, "push", token);
-      setChannels(prev => [...prev, ch]);
+      await addChannelMutation.mutateAsync({ channelType: "push", destination: token });
       Alert.alert("Push Enabled", "This device will now receive push alerts for this watchlist.");
     } catch (e) {
       Alert.alert("Push setup failed", e.message);
@@ -226,8 +209,7 @@ export default function WatchlistDetailScreen({ route, navigation }) {
     Alert.prompt(`Add ${label}`, placeholders[channelType], async (dest) => {
       if (!dest?.trim()) return;
       try {
-        const ch = await api.addAlertChannel(watchlistId, channelType, dest.trim());
-        setChannels(prev => [...prev, ch]);
+        await addChannelMutation.mutateAsync({ channelType, destination: dest.trim() });
       } catch (e) {
         Alert.alert("Error", e.message);
       }
@@ -237,24 +219,17 @@ export default function WatchlistDetailScreen({ route, navigation }) {
   const handleDeleteChannel = (channelId) => {
     Alert.alert("Remove Channel", "Remove this alert channel?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: async () => {
-        try {
-          await api.deleteAlertChannel(watchlistId, channelId);
-          setChannels(prev => prev.filter(c => c.id !== channelId));
-        } catch (e) {
-          Alert.alert("Error", e.message);
-        }
+      { text: "Remove", style: "destructive", onPress: () => {
+        deleteChannelMutation.mutate(channelId, { onError: (e) => Alert.alert("Error", e.message) });
       }},
     ]);
   };
 
-  const handleTestChannel = async (channelId) => {
-    try {
-      await api.testAlertChannel(watchlistId, channelId);
-      Alert.alert("Test Sent", "Test alert dispatched.");
-    } catch (e) {
-      Alert.alert("Test failed", e.message);
-    }
+  const handleTestChannel = (channelId) => {
+    testChannelMutation.mutate(channelId, {
+      onSuccess: () => Alert.alert("Test Sent", "Test alert dispatched."),
+      onError: (e) => Alert.alert("Test failed", e.message),
+    });
   };
 
   const ruleOptions = [
@@ -273,11 +248,10 @@ export default function WatchlistDetailScreen({ route, navigation }) {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.root}>
       <ScrollView
-        style={styles.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
-        contentContainerStyle={{ paddingBottom: 48 }}
+        contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
         {/* Rule status button */}
@@ -286,7 +260,7 @@ export default function WatchlistDetailScreen({ route, navigation }) {
           ruleName={watchlist.rule_name}
           ruleActive={watchlist.rule_active}
           onToggle={handleToggle}
-          onEdit={() => setEditing(true)}
+          onEdit={startEditing}
         />
 
         {/* Screener refresh */}
@@ -308,7 +282,7 @@ export default function WatchlistDetailScreen({ route, navigation }) {
         </View>
 
         {/* Edit toggle */}
-        <TouchableOpacity style={styles.editToggleBtn} onPress={() => setEditing(e => !e)}>
+        <TouchableOpacity style={styles.editToggleBtn} onPress={() => editing ? setEditing(false) : startEditing()}>
           <Ionicons name={editing ? "checkmark" : "create-outline"} size={16} color={colors.accent} />
           <Text style={styles.editToggleText}>{editing ? "Cancel Edit" : "Edit Watchlist"}</Text>
         </TouchableOpacity>
@@ -352,14 +326,6 @@ export default function WatchlistDetailScreen({ route, navigation }) {
               keyboardType="decimal-pad"
             />
           </View>
-        )}
-
-        {/* Save button (edit mode) — kept above the symbols list so it's
-            visible without scrolling past a potentially long list */}
-        {editing && (
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdits} disabled={saving}>
-            <Text style={styles.saveBtnText}>{saving ? "Saving..." : "Save Changes"}</Text>
-          </TouchableOpacity>
         )}
 
         {/* Alert channels */}
@@ -444,13 +410,23 @@ export default function WatchlistDetailScreen({ route, navigation }) {
           ))
         )}
       </ScrollView>
+
+      {/* Fixed footer so Save doesn't require scrolling past a long symbols list */}
+      {editing && (
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdits} disabled={updateMutation.isPending}>
+            <Text style={styles.saveBtnText}>{updateMutation.isPending ? "Saving..." : "Save Changes"}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   loading: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.bg },
-  container: { flex: 1, backgroundColor: colors.bg, padding: layout.screenPadding },
+  root: { flex: 1, backgroundColor: colors.bg },
+  scrollContent: { padding: layout.screenPadding, paddingBottom: 48 },
 
   ruleBtn: {
     flexDirection: "row", alignItems: "center", gap: 10,
@@ -533,9 +509,12 @@ const styles = StyleSheet.create({
 
   empty: { ...typography.bodySmall, marginBottom: 12 },
 
+  footer: {
+    padding: 16, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg,
+  },
   saveBtn: {
     backgroundColor: colors.accent, padding: 16, alignItems: "center",
-    borderRadius: layout.buttonRadius, marginTop: 20,
+    borderRadius: layout.buttonRadius,
   },
   saveBtnText: { color: "#000", fontFamily: "Inter_800ExtraBold", fontSize: 16 },
 });

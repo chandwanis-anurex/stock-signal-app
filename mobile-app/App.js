@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, AppState } from "react-native";
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from "@expo-google-fonts/inter";
 import { NavigationContainer, DarkTheme, useNavigation } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { focusManager } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth } from "./api/client";
+import { queryClient, persistOptions, clearQueryCache } from "./api/queryClient";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "./theme";
 import Logo from "./components/Logo";
@@ -21,6 +24,7 @@ import ManualWatchlistScreen from "./screens/ManualWatchlistScreen";
 import RulesListScreen       from "./screens/RulesListScreen";
 import RuleBuilderScreen     from "./screens/RuleBuilderScreen";
 import SignalFeedScreen      from "./screens/SignalFeedScreen";
+import SignalDetailScreen    from "./screens/SignalDetailScreen";
 import AnalyticsScreen       from "./screens/AnalyticsScreen";
 import HelpScreen            from "./screens/HelpScreen";
 import OnboardingScreen      from "./screens/OnboardingScreen";
@@ -79,6 +83,16 @@ function RulesStack() {
       <Stack.Screen name="RuleBuilder" component={RuleBuilderScreen} options={({ route }) => ({
         title: route.params?.existingRule ? route.params.existingRule.name : "New Rule Set",
       })} />
+    </Stack.Navigator>
+  );
+}
+
+// ── Signals stack ───────────────────────────────────────────────────────────
+function SignalsStack() {
+  return (
+    <Stack.Navigator screenOptions={stackScreenOptions}>
+      <Stack.Screen name="SignalFeed"   component={SignalFeedScreen}   options={{ title: "Trade Signals" }} />
+      <Stack.Screen name="SignalDetail" component={SignalDetailScreen} options={{ title: "Signal" }} />
     </Stack.Navigator>
   );
 }
@@ -166,8 +180,8 @@ function MainApp({ onLogout }) {
         })}
       />
 
-      <Tabs.Screen name="Signals" component={SignalFeedScreen} options={{
-        ...tabOpts("flash"), title: "Trade Signals",
+      <Tabs.Screen name="Signals" component={SignalsStack} options={{
+        headerShown: false, tabBarLabel: "Signals",
         tabBarIcon: ({ color, size }) => <Ionicons name="flash" size={size + 6} color={color} />,
       }} />
 
@@ -203,30 +217,42 @@ export default function App() {
     });
   }, []);
 
-  if (!ready || !fontsLoaded) {
-    return <View style={styles.loading}><ActivityIndicator size="large" color={colors.accent} /></View>;
-  }
+  // RN doesn't fire the web `visibilitychange` event React Query's default
+  // focus manager listens for, so background/foreground transitions need to
+  // be wired up manually for stale queries to revalidate on app resume.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      focusManager.setFocused(state === "active");
+    });
+    return () => sub.remove();
+  }, []);
 
-  if (!authenticated) {
-    return (
-      <>
-        <AuthScreen onAuthenticated={() => setAuthenticated(true)} />
-        <KeyboardDoneBar />
-      </>
-    );
-  }
-
-  if (!onboarded) {
-    return <OnboardingScreen onDone={() => setOnboarded(true)} />;
-  }
+  const onLogout = () => {
+    clearQueryCache(); // don't leak this account's cached data into the next login
+    setAuthenticated(false);
+    setOnboarded(false);
+  };
 
   return (
-    <>
-      <NavigationContainer theme={navTheme}>
-        <MainApp onLogout={() => { setAuthenticated(false); setOnboarded(false); }} />
-      </NavigationContainer>
-      <KeyboardDoneBar />
-    </>
+    <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+      {!ready || !fontsLoaded ? (
+        <View style={styles.loading}><ActivityIndicator size="large" color={colors.accent} /></View>
+      ) : !authenticated ? (
+        <>
+          <AuthScreen onAuthenticated={() => setAuthenticated(true)} />
+          <KeyboardDoneBar />
+        </>
+      ) : !onboarded ? (
+        <OnboardingScreen onDone={() => setOnboarded(true)} />
+      ) : (
+        <>
+          <NavigationContainer theme={navTheme}>
+            <MainApp onLogout={onLogout} />
+          </NavigationContainer>
+          <KeyboardDoneBar />
+        </>
+      )}
+    </PersistQueryClientProvider>
   );
 }
 

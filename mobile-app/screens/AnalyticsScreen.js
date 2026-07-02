@@ -1,7 +1,6 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
-import { api } from "../api/client";
+import { useAllRulesQuery, useRulePerformanceQuery } from "../api/queries";
 import { colors, typography, layout } from "../theme";
 
 const PERIODS = [
@@ -26,46 +25,13 @@ function MetricBox({ value, label, color }) {
 }
 
 export default function AnalyticsScreen() {
-  const [rules, setRules] = useState([]);
+  const { data: rules = [] } = useAllRulesQuery();
   const [selectedRule, setSelectedRule] = useState(null);
   const [period, setPeriod] = useState("weekly");
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const { data: summary, isLoading: loading } = useRulePerformanceQuery(selectedRule?.id, period);
 
-  const loadRules = useCallback(async () => {
-    try {
-      const data = await api.listAllRules();
-      setRules(data);
-    } catch (e) {
-      console.warn(e);
-    }
-  }, []);
-
-  useFocusEffect(useCallback(() => { loadRules(); }, [loadRules]));
-
-  const loadPerformance = useCallback(async (rule, p) => {
-    if (!rule) return;
-    setLoading(true);
-    setSummary(null);
-    try {
-      const data = await api.getRulePerformance(rule.id, p);
-      setSummary(data);
-    } catch (e) {
-      console.warn(e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const selectRule = (rule) => {
-    setSelectedRule(rule);
-    loadPerformance(rule, period);
-  };
-
-  const selectPeriod = (p) => {
-    setPeriod(p);
-    loadPerformance(selectedRule, p);
-  };
+  const selectRule = (rule) => setSelectedRule(rule);
+  const selectPeriod = (p) => setPeriod(p);
 
   const avgColor = summary?.avg_return_pct > 0 ? colors.buy : summary?.avg_return_pct < 0 ? colors.sell : null;
   const bestColor = summary?.best_return > 0 ? colors.buy : colors.sell;

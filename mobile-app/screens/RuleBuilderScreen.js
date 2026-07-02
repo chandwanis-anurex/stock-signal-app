@@ -4,7 +4,7 @@ import {
   ScrollView, Alert, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { api } from "../api/client";
+import { useCreateRuleMutation, useUpdateRuleMutation } from "../api/queries";
 import { colors, typography, layout } from "../theme";
 import Dropdown from "../components/Dropdown";
 
@@ -129,6 +129,9 @@ export default function RuleBuilderScreen({ route, navigation }) {
     existingRule?.sell_condition?.stop_loss_pct != null ? String(existingRule.sell_condition.stop_loss_pct) : ""
   );
 
+  const createMutation = useCreateRuleMutation();
+  const updateMutation = useUpdateRuleMutation(existingRule?.id);
+
   const updateTerm = (list, setList, i, updated) => {
     const next = [...list]; next[i] = updated; setList(next);
   };
@@ -145,7 +148,7 @@ export default function RuleBuilderScreen({ route, navigation }) {
 
     try {
       if (isEditing) {
-        const result = await api.updateRule(existingRule.id, name.trim(), buyCondition, sellCondition);
+        const result = await updateMutation.mutateAsync({ name: name.trim(), buyCondition, sellCondition });
         if (result.stopped_watchlists?.length > 0) {
           Alert.alert(
             "Rule Updated",
@@ -156,7 +159,7 @@ export default function RuleBuilderScreen({ route, navigation }) {
           navigation.goBack();
         }
       } else {
-        await api.createRule(name.trim(), buyCondition, sellCondition);
+        await createMutation.mutateAsync({ name: name.trim(), buyCondition, sellCondition });
         navigation.goBack();
       }
     } catch (e) {

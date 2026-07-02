@@ -15,6 +15,9 @@ mobile-app/node_modules/
 # Expo
 mobile-app/.expo/
 mobile-app/dist/
+# Generated native project (expo prebuild) — rebuilt on demand, never committed
+mobile-app/ios/
+mobile-app/android/
 
 # macOS
 .DS_Store

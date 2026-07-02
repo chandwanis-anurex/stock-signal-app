@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
-import { api } from "../api/client";
+import { useCreateWatchlistManualMutation } from "../api/queries";
 import { colors, typography, layout } from "../theme";
 
 export default function ManualWatchlistScreen({ navigation }) {
   const [name, setName] = useState("");
   const [symbolsText, setSymbolsText] = useState("");
-  const [saving, setSaving] = useState(false);
+  const createMutation = useCreateWatchlistManualMutation();
+  const saving = createMutation.isPending;
 
   const parsedSymbols = symbolsText
     .split(",")
@@ -16,14 +17,11 @@ export default function ManualWatchlistScreen({ navigation }) {
   const save = async () => {
     if (!name.trim()) { Alert.alert("Enter a watchlist name"); return; }
     if (parsedSymbols.length === 0) { Alert.alert("Enter at least one symbol"); return; }
-    setSaving(true);
     try {
-      await api.createWatchlistManual(name.trim(), parsedSymbols);
+      await createMutation.mutateAsync({ name: name.trim(), symbols: parsedSymbols });
       navigation.popToTop();
     } catch (e) {
       Alert.alert("Failed to create watchlist", e.message);
-    } finally {
-      setSaving(false);
     }
   };
 

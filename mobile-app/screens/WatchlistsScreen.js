@@ -1,10 +1,9 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
-import { api } from "../api/client";
+import { useWatchlistsQuery, useDeleteWatchlistMutation } from "../api/queries";
 import { colors, typography, layout } from "../theme";
 
 const MAX = 25;
@@ -20,20 +19,11 @@ function StatusIcon({ ruleId, ruleActive }) {
 }
 
 export default function WatchlistsScreen({ navigation }) {
-  const [watchlists, setWatchlists] = useState([]);
+  const { data: watchlists = [], refetch } = useWatchlistsQuery();
+  const deleteMutation = useDeleteWatchlistMutation();
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      setWatchlists(await api.listWatchlists());
-    } catch (e) {
-      console.warn(e);
-    }
-  }, []);
-
-  useFocusEffect(useCallback(() => { load(); }, [load]));
-
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  const onRefresh = async () => { setRefreshing(true); await refetch(); setRefreshing(false); };
 
   const confirmDelete = (item) => {
     Alert.alert(
@@ -41,13 +31,10 @@ export default function WatchlistsScreen({ navigation }) {
       `Delete "${item.name}"? This also removes its symbols and alert settings.`,
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: async () => {
-          try {
-            await api.deleteWatchlist(item.id);
-            setWatchlists(prev => prev.filter(w => w.id !== item.id));
-          } catch (e) {
-            Alert.alert("Delete failed", e.message);
-          }
+        { text: "Delete", style: "destructive", onPress: () => {
+          deleteMutation.mutate(item.id, {
+            onError: (e) => Alert.alert("Delete failed", e.message),
+          });
         }},
       ]
     );

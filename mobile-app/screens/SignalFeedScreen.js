@@ -1,40 +1,25 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useState } from "react";
 import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Animated, Alert } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
 import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
-import { api } from "../api/client";
+import { useSignalsQuery, useDeleteSignalMutation, useHaltAllWatchlistsMutation } from "../api/queries";
 import { colors, typography, layout } from "../theme";
 import { getCompanyName } from "../data/companyNames";
 
 export default function SignalFeedScreen({ navigation }) {
-  const [signals, setSignals] = useState([]);
+  const { data: signals = [], refetch } = useSignalsQuery();
+  const deleteMutation = useDeleteSignalMutation();
+  const haltAllMutation = useHaltAllWatchlistsMutation();
   const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const data = await api.listSignals();
-      setSignals(data);
-    } catch (e) {
-      console.warn(e);
-    }
-  }, []);
-
-  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await load();
+    await refetch();
     setRefreshing(false);
   };
 
-  const deleteSignal = async (id) => {
-    try {
-      await api.deleteSignal(id);
-      setSignals((prev) => prev.filter((s) => s.id !== id));
-    } catch (e) {
-      console.warn(e);
-    }
+  const deleteSignal = (id) => {
+    deleteMutation.mutate(id, { onError: (e) => console.warn(e) });
   };
 
   const renderRightActions = (id) => (
@@ -49,13 +34,11 @@ export default function SignalFeedScreen({ navigation }) {
       "This will stop ALL active rules on ALL watchlists. You will need to restart each watchlist individually. Continue?",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Halt All", style: "destructive", onPress: async () => {
-          try {
-            const res = await api.haltAllWatchlists();
-            Alert.alert("Done", `${res.halted} watchlist${res.halted !== 1 ? "s" : ""} halted. Go to Watchlists to restart them.`);
-          } catch (e) {
-            Alert.alert("Error", e.message);
-          }
+        { text: "Halt All", style: "destructive", onPress: () => {
+          haltAllMutation.mutate(undefined, {
+            onSuccess: (res) => Alert.alert("Done", `${res.halted} watchlist${res.halted !== 1 ? "s" : ""} halted. Go to Watchlists to restart them.`),
+            onError: (e) => Alert.alert("Error", e.message),
+          });
         }},
       ]
     );
@@ -78,9 +61,14 @@ export default function SignalFeedScreen({ navigation }) {
           const firedAt = new Date(item.fired_at);
           const dateStr = firedAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
           const timeStr = firedAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+          const hasPl = item.pl_pct !== null && item.pl_pct !== undefined;
+          const inProfit = hasPl && item.pl_pct >= 0;
           return (
             <Swipeable renderRightActions={() => renderRightActions(item.id)} overshootRight={false}>
-              <View style={styles.card}>
+              <TouchableOpacity
+                style={styles.card}
+                onPress={() => navigation.navigate("SignalDetail", { signalId: item.id })}
+              >
                 <View style={[styles.badge, isBuy ? styles.buyBadge : styles.sellBadge]}>
                   <Text style={styles.badgeText}>{isBuy ? "BUY" : "SELL"}</Text>
                 </View>
@@ -93,8 +81,15 @@ export default function SignalFeedScreen({ navigation }) {
                   <Text style={styles.price}>${item.price_at_signal?.toFixed(2) ?? "—"}</Text>
                   <Text style={styles.time}>{dateStr}</Text>
                   <Text style={styles.time}>{timeStr}</Text>
+                  {hasPl && (
+                    <View style={[styles.plBand, inProfit ? styles.plBandProfit : styles.plBandLoss]}>
+                      <Text style={styles.plBandText}>
+                        {inProfit ? "+" : ""}{item.pl_pct.toFixed(1)}%
+                      </Text>
+                    </View>
+                  )}
                 </View>
-              </View>
+              </TouchableOpacity>
             </Swipeable>
           );
         }}
@@ -150,6 +145,10 @@ const styles = StyleSheet.create({
   cardRight: { alignItems: "flex-end" },
   price: { fontSize: 15, fontFamily: "Inter_700Bold", color: colors.textPrimary },
   time: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  plBand: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 5 },
+  plBandProfit: { backgroundColor: colors.buy },
+  plBandLoss: { backgroundColor: colors.sell },
+  plBandText: { color: "#ffffff", fontSize: 12, fontFamily: "Inter_700Bold" },
   deleteAction: {
     backgroundColor: colors.sell, justifyContent: "center",
     alignItems: "center", width: 80, borderRadius: layout.cardRadius,

@@ -1,29 +1,18 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, RefreshControl,
 } from "react-native";
 import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
-import { api } from "../api/client";
+import { useRulesQuery, useDeleteRuleMutation } from "../api/queries";
 import { colors, typography, layout } from "../theme";
 
 export default function RulesListScreen({ navigation }) {
-  const [rules, setRules]         = useState([]);
+  const { data: rules = [], refetch } = useRulesQuery();
+  const deleteMutation = useDeleteRuleMutation();
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const data = await api.listRules();
-      setRules(data);
-    } catch (e) {
-      console.warn(e);
-    }
-  }, []);
-
-  useFocusEffect(useCallback(() => { load(); }, [load]));
-
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  const onRefresh = async () => { setRefreshing(true); await refetch(); setRefreshing(false); };
 
   const confirmDelete = (rule) => {
     const msg = rule.watchlist_count > 0
@@ -32,13 +21,8 @@ export default function RulesListScreen({ navigation }) {
 
     Alert.alert("Delete Rule", msg, [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
-        try {
-          await api.deleteRule(rule.id);
-          setRules(prev => prev.filter(r => r.id !== rule.id));
-        } catch (e) {
-          Alert.alert("Delete failed", e.message);
-        }
+      { text: "Delete", style: "destructive", onPress: () => {
+        deleteMutation.mutate(rule.id, { onError: (e) => Alert.alert("Delete failed", e.message) });
       }},
     ]);
   };

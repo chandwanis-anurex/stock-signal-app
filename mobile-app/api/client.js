@@ -137,6 +137,11 @@ export const api = {
   deleteSignal: (signalId) =>
     request(`/signals/${signalId}`, { method: "DELETE" }),
 
+  getSignal: (signalId) => request(`/signals/${signalId}`),
+
+  sellSignalNow: (signalId) =>
+    request(`/signals/${signalId}/sell`, { method: "POST" }),
+
   // ── Analytics ─────────────────────────────────────────────────────────────
   listAllRules: () => request("/rules"),
 

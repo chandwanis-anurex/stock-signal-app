@@ -6,6 +6,7 @@ import {
 import { Swipeable, GestureHandlerRootView } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../api/client";
+import { useCreateWatchlistMutation, useDeleteWatchlistMutation } from "../api/queries";
 import { colors, typography, layout } from "../theme";
 import Dropdown from "../components/Dropdown";
 
@@ -50,6 +51,8 @@ export default function ScreenerScreen({ navigation }) {
   const [filters, setFilters]     = useState([{ field: "market_cap_basic", operator: "gt", value: "1000000000" }]);
   const [loading, setLoading]     = useState(false);
   const [results, setResults]     = useState(null); // null = not run yet
+  const createMutation = useCreateWatchlistMutation();
+  const deleteMutation = useDeleteWatchlistMutation();
 
   const buildCriteria = () => ({
     exchanges: exchanges.split(",").map(e => e.trim()).filter(Boolean),
@@ -96,7 +99,7 @@ export default function ScreenerScreen({ navigation }) {
               `A watchlist named "${trimmed}" already exists.`,
               [
                 { text: "Replace It", style: "destructive", onPress: async () => {
-                  await api.deleteWatchlist(conflict.id);
+                  await deleteMutation.mutateAsync(conflict.id);
                   await _create(trimmed);
                 }},
                 { text: "Change Name", onPress: () => saveToWatchlist() },
@@ -116,7 +119,7 @@ export default function ScreenerScreen({ navigation }) {
 
   const _create = async (name) => {
     try {
-      const wl = await api.createWatchlist(name, buildCriteria());
+      const wl = await createMutation.mutateAsync({ name, criteria: buildCriteria() });
       Alert.alert("Watchlist Saved", `"${name}" created with ${results.length} symbols.`, [
         { text: "View Watchlist", onPress: () => navigation.navigate("WatchlistsTab", { screen: "WatchlistDetail", params: { watchlistId: wl.id, name: wl.name } }) },
         { text: "Done" },
@@ -140,8 +143,8 @@ export default function ScreenerScreen({ navigation }) {
   );
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
+    <GestureHandlerRootView style={styles.root}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
 
         {/* Criteria */}
         <Dropdown label="Exchanges" value={exchanges} options={EXCHANGES} onChange={setExchanges} />
@@ -204,22 +207,26 @@ export default function ScreenerScreen({ navigation }) {
                 </Swipeable>
               ))
             )}
-
-            {results.length > 0 && (
-              <TouchableOpacity style={styles.saveBtn} onPress={saveToWatchlist}>
-                <Ionicons name="bookmark" size={18} color="#000" />
-                <Text style={styles.saveBtnText}>  Save to Watchlist</Text>
-              </TouchableOpacity>
-            )}
           </>
         )}
       </ScrollView>
+
+      {/* Fixed footer so Save doesn't require scrolling past a long results list */}
+      {results !== null && results.length > 0 && (
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.saveBtn} onPress={saveToWatchlist}>
+            <Ionicons name="bookmark" size={18} color="#000" />
+            <Text style={styles.saveBtnText}>  Save to Watchlist</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: layout.screenPadding },
+  root: { flex: 1, backgroundColor: colors.bg },
+  scrollContent: { padding: layout.screenPadding, paddingBottom: 40 },
 
   sectionLabel: { ...typography.label, marginTop: 8, marginBottom: 10 },
   inputLabel:   { ...typography.label, marginBottom: 6 },
@@ -266,9 +273,12 @@ const styles = StyleSheet.create({
 
   empty: { ...typography.bodySmall, textAlign: "center", marginTop: 16 },
 
+  footer: {
+    padding: 16, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg,
+  },
   saveBtn: {
     backgroundColor: colors.buy, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    padding: 16, borderRadius: layout.buttonRadius, marginTop: 16,
+    padding: 16, borderRadius: layout.buttonRadius,
   },
   saveBtnText: { color: "#fff", fontFamily: "Inter_800ExtraBold", fontSize: 16 },
 });
