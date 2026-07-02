@@ -94,7 +94,7 @@ eas submit --platform ios                     # upload to TestFlight
 
 ## App Store / TestFlight
 - Bundle ID: `com.chandwanis.signalflow`
-- Build number: `1` (increment in app.json for each TestFlight upload)
+- Build number: auto-incremented remotely by EAS on every `eas build --profile production` (see `eas.json`: `cli.appVersionSource: "remote"`, `build.production.ios.autoIncrement: true`) — don't set `ios.buildNumber` in `app.json`, it's ignored
 - App Store Connect: appstoreconnect.apple.com
 - EAS project ID: `704b6240-b34b-43ee-a76e-2be8ddade1e9`
 - EAS owner: `rakeshchandwani`

@@ -13,7 +13,6 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.chandwanis.signalflow",
-      "buildNumber": "2",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
