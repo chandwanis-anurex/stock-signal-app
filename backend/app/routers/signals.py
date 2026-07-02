@@ -44,6 +44,51 @@ def list_signals(
     rule_ids = {s.rule_id for s in signals if s.rule_id}
     rules = {r.id: r.name for r in db.query(Rule).filter(Rule.id.in_(rule_ids)).all()}
 
+    provider = get_provider()
+
+    # Realized P/L links: exit price for closed buys, entry price for sells
+    closed_buy_ids = [s.id for s in signals if s.side == "buy" and s.closed_at is not None]
+    exit_prices = {}
+    if closed_buy_ids:
+        for sell in db.query(Signal).filter(Signal.closes_signal_id.in_(closed_buy_ids)).all():
+            exit_prices[sell.closes_signal_id] = sell.price_at_signal
+
+    entry_buy_ids = {s.closes_signal_id for s in signals if s.side == "sell" and s.closes_signal_id}
+    entry_prices = {}
+    if entry_buy_ids:
+        for buy in db.query(Signal).filter(Signal.id.in_(entry_buy_ids)).all():
+            entry_prices[buy.id] = buy.price_at_signal
+
+    # Unrealized P/L for open buys needs live prices — one batched fetch;
+    # on failure the feed still loads, just without those bands.
+    open_symbols = sorted({s.symbol for s in signals if s.side == "buy" and s.closed_at is None})
+    try:
+        live_prices = provider.get_latest_prices(open_symbols) if open_symbols else {}
+    except Exception:
+        live_prices = {}
+
+    def _pl_fields(s: Signal) -> dict:
+        current_price = None
+        pl_pct = None
+        if s.side == "buy":
+            if s.closed_at is None:
+                current_price = live_prices.get(s.symbol)
+                if current_price is not None and s.price_at_signal:
+                    pl_pct = (current_price - s.price_at_signal) / s.price_at_signal * 100
+            else:
+                exit_price = exit_prices.get(s.id)
+                if exit_price is not None and s.price_at_signal:
+                    pl_pct = (exit_price - s.price_at_signal) / s.price_at_signal * 100
+        elif s.closes_signal_id:
+            entry = entry_prices.get(s.closes_signal_id)
+            if entry:
+                pl_pct = (s.price_at_signal - entry) / entry * 100
+        return {
+            "is_open": s.side == "buy" and s.closed_at is None,
+            "current_price": current_price,
+            "pl_pct": pl_pct,
+        }
+
     symbol_set = {s.symbol for s in signals}
     company_map = {}
     ws_rows = {ws.symbol: ws for ws in db.query(WatchlistSymbol).filter(WatchlistSymbol.symbol.in_(symbol_set)).all()}
@@ -51,10 +96,9 @@ def list_signals(
         if ws.company_name:
             company_map[sym] = ws.company_name
 
-    # For any symbol still missing a name, fetch from Polygon and cache it
+    # For any symbol still missing a name, fetch from the provider and cache it
     missing = symbol_set - set(company_map.keys())
     if missing:
-        provider = get_provider()
         for sym in missing:
             name = provider.get_company_name(sym)
             if name:
@@ -73,6 +117,7 @@ def list_signals(
             "price_at_signal": s.price_at_signal,
             "fired_at": s.fired_at.replace(tzinfo=timezone.utc).isoformat(),
             "rule_name": rules.get(s.rule_id, ""),
+            **_pl_fields(s),
         }
         for s in signals
     ]

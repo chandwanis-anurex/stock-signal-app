@@ -56,7 +56,7 @@ stock-signal-app/
 | Backend API | Railway | Auto-deploys on push to `main` |
 | Database | PostgreSQL on Railway | SQLAlchemy create_all + inline ALTER TABLE migrations in main.py lifespan |
 | Mobile | EAS Build (Expo) | `preview` profile = ad-hoc internal; `production` profile = App Store |
-| Market data | Polygon.io | OHLCV + ticker reference (company names). Key: `MARKET_DATA_API_KEY` env var |
+| Market data | Alpaca Market Data API | OHLCV + latest prices + company names. Free plan: `iex` feed (real-time, single exchange) + `delayed_sip` feed (15-min delayed, all exchanges incl. extended hours). Keys: `MARKET_DATA_API_KEY` + `MARKET_DATA_SECRET_KEY` |
 | Alerts — webhook | httpx POST | TradersPost-aware: detects URL and sends `{ticker, action, price, sentiment}` |
 | Alerts — email | SendGrid | Key: `SENDGRID_API_KEY`, `ALERT_FROM_EMAIL` |
 | Alerts — SMS | Twilio WhatsApp | Keys: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM/TO` |
@@ -65,8 +65,8 @@ stock-signal-app/
 ```
 DATABASE_URL
 JWT_SECRET
-MARKET_DATA_PROVIDER=polygon
 MARKET_DATA_API_KEY=
+MARKET_DATA_SECRET_KEY=
 SENDGRID_API_KEY=
 ALERT_FROM_EMAIL=
 TWILIO_ACCOUNT_SID=
